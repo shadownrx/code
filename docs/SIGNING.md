@@ -92,14 +92,30 @@ usa la plataforma (`Settings → Secrets and variables → Actions`).
    }
    ```
 
+   El mismo patrón (Groovy) aplica a un proyecto **Capacitor (PWA)** — ver el
+   ejemplo real en
+   [`examples/pwa-demo/android/app/build.gradle`](../examples/pwa-demo/android/app/build.gradle).
+   Única diferencia: la plantilla de Capacitor no define un `signingConfig` de
+   `debug` explícito, así que sin `key.properties` el `buildType release` queda
+   directamente sin firmar (no cae a la firma debug como en Flutter/RN) — es el
+   comportamiento normal del Android Gradle Plugin cuando no hay ningún
+   `signingConfig` asignado.
+
 Si estos secrets no están configurados, el build de Android simplemente se genera
-sin firma de release (firma debug por defecto de las plantillas de Flutter/RN).
+sin firma de release (firma debug por defecto de las plantillas de Flutter/RN; sin
+firma en absoluto en la plantilla de Capacitor).
 
 ## iOS
 
 La firma de iOS **requiere una cuenta de Apple Developer** (de pago, ~99 USD/año) —
 eso lo exige Apple, no esta plataforma. Sin esa cuenta, el workflow igual compila un
 `.app` sin firmar válido para simulador, útil para verificar que el proyecto compila.
+
+> **Nota sobre Capacitor**: un proyecto Capacitor nuevo no tiene `Podfile` ni
+> `.xcworkspace` (usa Swift Package Manager por defecto desde Capacitor 7), así que
+> la plataforma compila directo contra `ios/App/App.xcodeproj` con `-scheme App`.
+> El resto del proceso de firma (certificado, perfil de aprovisionamiento,
+> `ExportOptions.plist`) es idéntico a Flutter/React Native.
 
 Con cuenta de Apple Developer:
 

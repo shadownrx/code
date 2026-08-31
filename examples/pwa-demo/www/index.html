@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PWA Demo</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0f172a" />
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      text-align: center;
+    }
+    main { padding: 2rem; }
+    button {
+      margin-top: 1rem;
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>PWA Demo</h1>
+    <p>Empaquetada como app nativa con Capacitor.</p>
+    <button id="count">Tocado 0 veces</button>
+  </main>
+  <script>
+    let count = 0;
+    const btn = document.getElementById('count');
+    btn.addEventListener('click', () => {
+      count += 1;
+      btn.textContent = `Tocado ${count} veces`;
+    });
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>

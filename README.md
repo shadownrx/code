@@ -1,7 +1,8 @@
 # Plataforma de compilación Android + iOS
 
-Compila apps **Android** e **iOS** a partir de un mismo proyecto (Flutter o React
-Native), **gratis**, sin necesitar una Mac física para generar los builds de iOS.
+Compila apps **Android** e **iOS** a partir de un mismo proyecto (Flutter, React
+Native, o una PWA empaquetada con Capacitor), **gratis**, sin necesitar una Mac
+física para generar los builds de iOS.
 
 ## El problema que resuelve
 
@@ -21,7 +22,7 @@ jobs:
   build:
     uses: shadownrx/code/.github/workflows/build-mobile.yml@main
     with:
-      project_type: auto   # detecta Flutter o React Native automáticamente
+      project_type: auto   # detecta Flutter, React Native o PWA (Capacitor) automáticamente
     secrets: inherit
 ```
 
@@ -46,8 +47,9 @@ esta plataforma.
     build-mobile.yml             # el workflow reutilizable (el corazón de la plataforma)
     example-flutter-ci.yml       # autotest: corre build-mobile.yml sobre examples/flutter-demo
     example-react-native-ci.yml  # autotest: corre build-mobile.yml sobre examples/react-native-demo
+    example-pwa-ci.yml           # autotest: corre build-mobile.yml sobre examples/pwa-demo
   actions/
-    detect-project/          # detecta si el repo consumidor es Flutter o React Native
+    detect-project/          # detecta si el repo consumidor es Flutter, React Native o PWA (Capacitor)
 docs/
   USAGE.md                   # cómo conectar tu repo, paso a paso
   SIGNING.md                 # cómo configurar firma de Android/iOS y notificaciones
@@ -55,11 +57,13 @@ docs/
 examples/
   flutter-demo/               # app Flutter mínima usada para probar la plataforma
   react-native-demo/          # app React Native mínima usada para probar la plataforma
+  pwa-demo/                   # PWA mínima empaquetada con Capacitor, usada para probar la plataforma
 ```
 
 ## Empezar
 
-1. Leé [`docs/USAGE.md`](docs/USAGE.md) para conectar tu repo Flutter o React Native.
+1. Leé [`docs/USAGE.md`](docs/USAGE.md) para conectar tu repo Flutter, React Native
+   o una PWA.
 2. (Opcional) Leé [`docs/SIGNING.md`](docs/SIGNING.md) para builds firmados y
    notificaciones por Slack.
 3. Mirá los proyectos de ejemplo, ya configurados para esta plataforma (firma
@@ -69,6 +73,8 @@ examples/
      `android/app/build.gradle.kts`, disparado por `example-flutter-ci.yml`.
    - [`examples/react-native-demo`](examples/react-native-demo) — React Native, ver
      `android/app/build.gradle`, disparado por `example-react-native-ci.yml`.
+   - [`examples/pwa-demo`](examples/pwa-demo) — PWA empaquetada con Capacitor, ver
+     `android/app/build.gradle`, disparado por `example-pwa-ci.yml`.
 4. Si algo falla, mirá [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — reúne
    los errores que ya aparecieron armando esta plataforma (y cómo se resolvieron),
    no solo casos teóricos.

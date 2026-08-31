@@ -1,5 +1,5 @@
 name: "Detect mobile project type"
-description: "Detects whether a repository is a Flutter or React Native project"
+description: "Detects whether a repository is a Flutter, React Native, or Capacitor (PWA) project"
 
 inputs:
   working-directory:
@@ -9,7 +9,7 @@ inputs:
 
 outputs:
   project_type:
-    description: "flutter | react-native | unknown"
+    description: "flutter | react-native | pwa | unknown"
     value: ${{ steps.detect.outputs.project_type }}
 
 runs:
@@ -22,10 +22,13 @@ runs:
         if [ -f "pubspec.yaml" ] && grep -qE "^\s*flutter:" pubspec.yaml; then
           echo "Detected: Flutter project"
           echo "project_type=flutter" >> "$GITHUB_OUTPUT"
+        elif [ -f "capacitor.config.ts" ] || [ -f "capacitor.config.json" ]; then
+          echo "Detected: Capacitor (PWA) project"
+          echo "project_type=pwa" >> "$GITHUB_OUTPUT"
         elif [ -f "package.json" ] && grep -q '"react-native"' package.json; then
           echo "Detected: React Native project"
           echo "project_type=react-native" >> "$GITHUB_OUTPUT"
         else
-          echo "::warning::Could not auto-detect project type (no pubspec.yaml with flutter:, no package.json with react-native)"
+          echo "::warning::Could not auto-detect project type (no pubspec.yaml with flutter:, no capacitor.config.ts/json, no package.json with react-native)"
           echo "project_type=unknown" >> "$GITHUB_OUTPUT"
         fi

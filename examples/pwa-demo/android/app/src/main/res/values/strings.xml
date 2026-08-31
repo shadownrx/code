@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PWA Demo</string>
+    <string name="title_activity_main">PWA Demo</string>
+    <string name="package_name">com.shadownrx.pwademo</string>
+    <string name="custom_url_scheme">com.shadownrx.pwademo</string>
+</resources>

@@ -10,7 +10,7 @@ on:
   workflow_call:
     inputs:
       project_type:
-        description: "auto | flutter | react-native"
+        description: "auto | flutter | react-native | pwa"
         type: string
         required: false
         default: "auto"
@@ -147,6 +147,33 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease
 
+      # --- Capacitor (PWA wrapped as a native app) ---
+      - uses: actions/setup-node@v4
+        if: needs.detect.outputs.project_type == 'pwa'
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
+
+      - name: npm ci
+        if: needs.detect.outputs.project_type == 'pwa'
+        working-directory: ${{ inputs.working_directory }}
+        run: npm ci
+
+      - name: Build web assets and sync into the Android project
+        if: needs.detect.outputs.project_type == 'pwa'
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          npm run build --if-present
+          npx cap sync android
+
+      - name: gradlew assembleRelease + bundleRelease (Capacitor)
+        if: needs.detect.outputs.project_type == 'pwa'
+        working-directory: ${{ inputs.working_directory }}/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease
+
       - name: Collect Android artifacts
         working-directory: ${{ inputs.working_directory }}
         run: |
@@ -277,6 +304,50 @@ jobs:
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO
           mkdir -p build/ios-unsigned
           ditto -c -k --sequesterRsrc --keepParent "build/Build/Products/Release-iphonesimulator/$SCHEME.app" build/ios-unsigned/App-unsigned.zip
+
+      # --- Capacitor (PWA wrapped as a native app) ---
+      - uses: actions/setup-node@v4
+        if: needs.detect.outputs.project_type == 'pwa'
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
+
+      - name: npm ci
+        if: needs.detect.outputs.project_type == 'pwa'
+        working-directory: ${{ inputs.working_directory }}
+        run: npm ci
+
+      - name: Build web assets and sync into the iOS project
+        if: needs.detect.outputs.project_type == 'pwa'
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          npm run build --if-present
+          npx cap sync ios
+
+      # Note: Capacitor's default iOS template (since Capacitor 7) resolves
+      # dependencies via Swift Package Manager, not CocoaPods, so there is no
+      # Podfile/.xcworkspace to install — build straight from the .xcodeproj.
+      # If your project adds a plugin that still requires CocoaPods, Capacitor
+      # generates a Podfile under ios/App and `npx cap sync ios` runs `pod
+      # install` for you automatically in that case.
+      - name: xcodebuild archive (Capacitor, signed)
+        if: needs.detect.outputs.project_type == 'pwa' && steps.signing.outputs.enabled == 'true'
+        working-directory: ${{ inputs.working_directory }}/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -sdk iphoneos -configuration Release \
+            -archivePath build/App.xcarchive archive
+          xcodebuild -exportArchive -archivePath build/App.xcarchive \
+            -exportOptionsPlist ../../ExportOptions.plist -exportPath build/ipa
+
+      - name: xcodebuild archive (Capacitor, unsigned, no Apple Developer account required)
+        if: needs.detect.outputs.project_type == 'pwa' && steps.signing.outputs.enabled != 'true'
+        working-directory: ${{ inputs.working_directory }}/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -sdk iphonesimulator -configuration Release \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+          mkdir -p build/ios-unsigned
+          ditto -c -k --sequesterRsrc --keepParent "build/Build/Products/Release-iphonesimulator/App.app" build/ios-unsigned/App-unsigned.zip
 
       - name: Collect iOS artifacts
         working-directory: ${{ inputs.working_directory }}

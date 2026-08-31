@@ -1,0 +1,28 @@
+name: Example PWA (Capacitor) app (self-test)
+
+# Self-test for the reusable build-mobile.yml workflow: builds the sample
+# PWA-wrapped-in-Capacitor app in examples/pwa-demo for Android and iOS on
+# every change to the platform itself or to the example app.
+
+on:
+  push:
+    paths:
+      - "examples/pwa-demo/**"
+      - ".github/workflows/build-mobile.yml"
+      - ".github/workflows/example-pwa-ci.yml"
+      - ".github/actions/detect-project/**"
+  pull_request:
+    paths:
+      - "examples/pwa-demo/**"
+      - ".github/workflows/build-mobile.yml"
+      - ".github/workflows/example-pwa-ci.yml"
+      - ".github/actions/detect-project/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-mobile.yml
+    with:
+      project_type: pwa
+      working_directory: examples/pwa-demo
+    secrets: inherit

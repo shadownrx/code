@@ -1,0 +1,5 @@
+node_modules/
+npm-debug.log*
+
+# Android/iOS signing (see /docs/SIGNING.md)
+android/key.properties

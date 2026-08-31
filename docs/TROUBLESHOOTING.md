@@ -101,16 +101,18 @@ si el `build.gradle` no está configurado para usarlo, Gradle sigue usando el
 **Solución:** aplicá el patrón de `key.properties` que documenta
 [`SIGNING.md`](./SIGNING.md) — hay un ejemplo real ya aplicado en
 [`examples/flutter-demo/android/app/build.gradle.kts`](../examples/flutter-demo/android/app/build.gradle.kts)
-(Kotlin DSL) y en
+(Kotlin DSL), y en Groovy en
 [`examples/react-native-demo/android/app/build.gradle`](../examples/react-native-demo/android/app/build.gradle)
-(Groovy).
+y [`examples/pwa-demo/android/app/build.gradle`](../examples/pwa-demo/android/app/build.gradle)
+(Capacitor).
 
 ## Errores de build de iOS
 
 ### `pod install` falla o no encuentra el `Podfile`
 
 **Síntoma:** el job `build-ios` falla en el paso `pod install` (solo en proyectos
-React Native; Flutter no usa este paso).
+React Native; ni Flutter ni un proyecto Capacitor sin plugins nativos extra usan
+este paso — ver la nota sobre Capacitor más abajo).
 
 **Causa habitual:** el `Podfile` no está en `ios/` dentro de `working_directory`,
 o el `Podfile.lock` quedó desincronizado con `package.json` después de agregar una
@@ -134,6 +136,45 @@ compartidos, la detección automática falla.
 "Shared" (Product → Scheme → Manage Schemes → checkbox Shared), commiteá el
 archivo `.xcscheme` generado bajo `xcshareddata/`.
 
+Nota: para proyectos **Capacitor (PWA)** este script no aplica — el scheme es
+siempre `App` (nombre fijo del template de Capacitor) y la plataforma lo usa
+directamente sin autodetección. Si igual falla con "scheme App is not currently
+configured", confirmá que no renombraste el target/scheme por tu cuenta en Xcode.
+
+### Capacitor: `npx cap sync` copia una carpeta `www`/`dist` vacía o vieja
+
+**Síntoma:** el build de Android/iOS compila bien, pero la app muestra contenido
+desactualizado o una pantalla en blanco.
+
+**Causa:** la plataforma corre `npm run build --if-present` antes de `npx cap
+sync`, pero si tu proyecto no tiene un script `build` en `package.json` (o genera
+la salida en una carpeta distinta de la que apunta `webDir` en
+`capacitor.config.ts`/`.json`), `cap sync` copia lo que ya esté ahí — vacío o
+desactualizado.
+
+**Solución:** confirmá que `webDir` en tu `capacitor.config` coincide exactamente
+con la carpeta de salida de tu bundler, y que el script `build` de `package.json`
+la genera antes de que corra `cap sync`. El ejemplo de este repo
+([`examples/pwa-demo`](../examples/pwa-demo)) no usa bundler — su `www/` ya está
+committeado tal cual, por eso no necesita script `build`.
+
+### Capacitor: falla en `pod install` después de agregar un plugin
+
+**Síntoma:** un proyecto Capacitor que compilaba bien empieza a fallar en un paso
+de CocoaPods que antes no existía.
+
+**Causa:** un proyecto Capacitor nuevo (desde Capacitor 7) no usa CocoaPods —
+resuelve todo con Swift Package Manager, por eso `build-mobile.yml` no corre
+`pod install` para `project_type: pwa`. Pero si agregás un plugin que todavía
+depende de CocoaPods, Capacitor genera un `Podfile` en `ios/App/` la primera vez
+que corrés `npx cap sync ios` localmente, y a partir de ahí el proyecto sí lo
+necesita.
+
+**Solución:** corré `npx cap sync ios` una vez en tu máquina (Mac) después de
+agregar el plugin, commiteá el `Podfile`/`Podfile.lock` resultante, y avisanos —
+la plataforma necesitaría un paso `pod install` adicional para ese caso (hoy no
+lo tiene, porque el ejemplo de referencia no lo necesita).
+
 ### El `.ipa` firmado no se genera aunque configuré los secrets de iOS
 
 **Síntoma:** el job iOS termina bien, pero solo aparece el `.app` sin firmar en
@@ -155,14 +196,14 @@ el perfil de aprovisionamiento — un Team ID incorrecto hace que `xcodebuild
 de correr.
 
 **Causa:** con `project_type: auto` (el default), la plataforma busca
-`pubspec.yaml` con una clave `flutter:` o `package.json` con la dependencia
-`"react-native"` **en la raíz de `working_directory`**. Si tu proyecto está en un
-monorepo y `working_directory` no apunta exactamente a esa carpeta, no lo
-encuentra.
+`pubspec.yaml` con una clave `flutter:`, un `capacitor.config.ts`/`.json`, o
+`package.json` con la dependencia `"react-native"` **en la raíz de
+`working_directory`**. Si tu proyecto está en un monorepo y `working_directory`
+no apunta exactamente a esa carpeta, no lo encuentra.
 
 **Solución:** ajustá `working_directory` para que apunte a la carpeta donde
-realmente están `pubspec.yaml`/`package.json`, o fijá `project_type: flutter` /
-`project_type: react-native` explícitamente en vez de `auto`.
+realmente están `pubspec.yaml`/`capacitor.config.*`/`package.json`, o fijá
+`project_type: flutter` / `react-native` / `pwa` explícitamente en vez de `auto`.
 
 ## No aparecen artefactos para descargar
 

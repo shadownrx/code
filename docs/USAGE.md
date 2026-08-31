@@ -2,8 +2,9 @@
 
 Esta plataforma no es un servicio al que subís código: es un **workflow reutilizable
 de GitHub Actions** que vive en este repo (`shadownrx/code`). Cualquier equipo con
-un proyecto **Flutter** o **React Native** en GitHub lo activa agregando un archivo
-de una sola línea de `uses:` a su propio repositorio. Cada equipo/repo queda
+un proyecto **Flutter**, **React Native**, o una **PWA** (empaquetada con
+[Capacitor](https://capacitorjs.com)) en GitHub lo activa agregando un archivo de
+una sola línea de `uses:` a su propio repositorio. Cada equipo/repo queda
 completamente aislado: usa sus propios minutos gratis de Actions, sus propios
 secretos y sus propios artefactos. No hay backend compartido, ni cuentas, ni
 límites impuestos por esta plataforma.
@@ -25,7 +26,7 @@ jobs:
   build:
     uses: shadownrx/code/.github/workflows/build-mobile.yml@main
     with:
-      project_type: auto        # auto | flutter | react-native
+      project_type: auto        # auto | flutter | react-native | pwa
       build_android: true
       build_ios: true
     secrets: inherit            # pasa tus secrets (firma, Slack, etc.) si los configuraste
@@ -80,6 +81,68 @@ Puntos a tener en cuenta con un proyecto React Native real:
   plantilla de React Native SÍ commitea el wrapper de Gradle por defecto — no hace
   falta tocar nada ahí.
 
+### Ejemplo real: PWA (Capacitor) — v1.2
+
+Este mismo repo incluye [`examples/pwa-demo`](../examples/pwa-demo): una PWA
+mínima (`www/index.html` + `manifest.webmanifest` + `sw.js`, sin bundler) envuelta
+como app nativa con [Capacitor](https://capacitorjs.com) (`npx cap add android` /
+`npx cap add ios`). El workflow que la compila es
+[`.github/workflows/example-pwa-ci.yml`](../.github/workflows/example-pwa-ci.yml):
+
+```yaml
+name: Example PWA (Capacitor) app (self-test)
+
+on:
+  push:
+    paths:
+      - "examples/pwa-demo/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-mobile.yml
+    with:
+      project_type: pwa
+      working_directory: examples/pwa-demo
+    secrets: inherit
+```
+
+Cómo conectar tu propia PWA:
+
+1. Si todavía no la envolviste, agregá Capacitor a tu proyecto:
+   ```bash
+   npm install @capacitor/core @capacitor/android @capacitor/ios
+   npm install -D @capacitor/cli
+   npx cap init "Mi App" com.miempresa.miapp --web-dir dist   # o build/, www/, etc.
+   npx cap add android
+   npx cap add ios
+   ```
+   `--web-dir` debe apuntar a la carpeta donde tu bundler deja el build de
+   producción de la PWA (`dist/`, `build/`, `www/`...).
+2. Commiteá `capacitor.config.json`/`.ts`, `android/` e `ios/` (con las mismas
+   exclusiones estándar de `.gitignore` que ya trae `npx cap add` — no hace falta
+   nada especial).
+3. Apuntá `working_directory` a la carpeta de tu proyecto y usá `project_type: pwa`
+   (o dejá `auto`: la plataforma detecta Capacitor por la presencia de
+   `capacitor.config.ts`/`.json`).
+
+Puntos a tener en cuenta:
+
+- **La plataforma corre `npm run build --if-present` antes de `npx cap sync`** —
+  si tu PWA usa un bundler (Vite, webpack, etc.), asegurate de que tu script
+  `build` en `package.json` genere el contenido de `webDir`. El ejemplo de este
+  repo no tiene bundler, así que ese paso no hace nada (`--if-present` lo omite
+  sin error).
+- **iOS sin CocoaPods**: Capacitor 7+ resuelve sus dependencias de iOS con Swift
+  Package Manager por defecto, no con CocoaPods — no hay `Podfile` ni
+  `.xcworkspace` en un proyecto Capacitor nuevo, así que la plataforma compila
+  directo contra `ios/App/App.xcodeproj`. Si agregás un plugin que todavía
+  requiere CocoaPods, Capacitor genera el `Podfile` solo y `npx cap sync ios` lo
+  instala automáticamente — no hace falta que cambies nada del workflow.
+- **Firma de Android**: mismo patrón `key.properties` que Flutter/React Native —
+  ver [`examples/pwa-demo/android/app/build.gradle`](../examples/pwa-demo/android/app/build.gradle)
+  y [`SIGNING.md`](./SIGNING.md).
+
 ## 2. Descargar los resultados
 
 Al terminar la ejecución, entrá a la pestaña **Actions** de tu repo → la ejecución
@@ -119,7 +182,7 @@ listos para tiendas, configurá los secrets descritos en [`SIGNING.md`](./SIGNIN
 
 | Input | Default | Descripción |
 |---|---|---|
-| `project_type` | `auto` | `auto`, `flutter` o `react-native`. `auto` detecta el tipo leyendo `pubspec.yaml`/`package.json`. |
+| `project_type` | `auto` | `auto`, `flutter`, `react-native` o `pwa`. `auto` detecta el tipo leyendo `pubspec.yaml`, `capacitor.config.ts`/`.json`, o `package.json`. |
 | `build_android` | `true` | Compilar o no la parte Android. |
 | `build_ios` | `true` | Compilar o no la parte iOS. |
 | `working_directory` | `.` | Ruta al proyecto, útil en monorepos. |
