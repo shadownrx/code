@@ -58,9 +58,18 @@ examples/
   flutter-demo/               # app Flutter mínima usada para probar la plataforma
   react-native-demo/          # app React Native mínima usada para probar la plataforma
   pwa-demo/                   # PWA mínima empaquetada con Capacitor, usada para probar la plataforma
+cli/
+  bin.js                      # configurador interactivo de terminal — ver cli/README.md
+Landing/                       # sitio de docs/landing en Astro (vercel.com/docs-like)
 ```
 
 ## Empezar
+
+**Opción rápida — asistente de terminal:** `node cli/bin.js` parado en tu
+proyecto (Flutter, React Native o PWA) te hace un par de preguntas y te deja
+`.github/workflows/build.yml` ya escrito. Ver [`cli/README.md`](cli/README.md).
+
+**Manual:**
 
 1. Leé [`docs/USAGE.md`](docs/USAGE.md) para conectar tu repo Flutter, React Native
    o una PWA.

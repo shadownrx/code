@@ -1,0 +1,24 @@
+{
+  "name": "create-mobile-ci",
+  "version": "1.0.0",
+  "description": "Interactive setup for the shadownrx/code free Android+iOS build platform — writes .github/workflows/build.yml for your Flutter, React Native, or PWA project.",
+  "type": "module",
+  "bin": {
+    "create-mobile-ci": "./bin.js"
+  },
+  "files": [
+    "bin.js",
+    "lib.js"
+  ],
+  "scripts": {
+    "start": "node bin.js",
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "prompts": "^2.4.2"
+  }
+}
