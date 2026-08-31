@@ -1,0 +1,100 @@
+---
+import '../styles/global.css';
+import TopNav from '../components/TopNav.astro';
+import Sidebar from '../components/Sidebar.astro';
+import { getSidebar } from '../lib/nav';
+
+interface Props {
+  title: string;
+  description: string;
+}
+const { title, description } = Astro.props;
+const sections = await getSidebar();
+const currentPath = Astro.url.pathname;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · shadownrx/code</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script is:inline>
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <TopNav sections={sections} />
+    <div class="shell">
+      <aside class="shell-sidebar">
+        <Sidebar sections={sections} currentPath={currentPath} />
+      </aside>
+      <div class="nav-scrim"></div>
+
+      <main class="shell-content">
+        <article class="prose">
+          <slot />
+        </article>
+      </main>
+
+      <aside class="shell-toc">
+        <slot name="toc" />
+      </aside>
+    </div>
+  </body>
+</html>
+
+<style is:global>
+  .shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 220px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 1150px) {
+    .shell { grid-template-columns: 240px minmax(0, 1fr); }
+    .shell-toc { display: none; }
+  }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: minmax(0, 1fr); }
+    .shell-sidebar {
+      position: fixed; top: 56px; bottom: 0; left: 0; width: 260px;
+      background: var(--bg);
+      border-right: 1px solid var(--border);
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+      z-index: 45;
+      overflow-y: auto;
+    }
+    body.nav-open .shell-sidebar { transform: translateX(0); }
+    .nav-scrim {
+      display: none;
+      position: fixed; inset: 56px 0 0 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 44;
+    }
+    body.nav-open .nav-scrim { display: block; }
+  }
+  @media (min-width: 901px) {
+    .shell-sidebar { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; border-right: 1px solid var(--border); }
+    .nav-scrim { display: none; }
+  }
+
+  .shell-content { min-width: 0; padding: 40px 32px 80px; }
+  .shell-toc { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shell-sidebar { transition: none; }
+  }
+</style>
+
+<script>
+  document.querySelector('.nav-scrim')?.addEventListener('click', () => {
+    document.body.classList.remove('nav-open');
+    document.getElementById('menu-toggle')?.setAttribute('aria-expanded', 'false');
+  });
+</script>

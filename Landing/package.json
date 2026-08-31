@@ -1,0 +1,17 @@
+{
+  "name": "shadownrx-code-docs",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^5.2.5",
+    "geist": "^1.3.1"
+  }
+}

@@ -1,0 +1,70 @@
+---
+interface Heading { depth: number; slug: string; text: string; }
+interface Props { headings: Heading[]; }
+const { headings } = Astro.props;
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+{items.length > 0 && (
+  <nav class="toc" aria-label="En esta página">
+    <p class="toc-heading">En esta página</p>
+    <ul>
+      {items.map((h) => (
+        <li class:list={['depth-' + h.depth]}>
+          <a href={`#${h.slug}`} data-toc-link data-slug={h.slug}>{h.text}</a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+)}
+
+<style>
+  .toc { padding: 28px 0 40px 24px; border-left: 1px solid var(--border); }
+  .toc-heading {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    margin: 0 0 10px;
+  }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  li.depth-3 { margin-left: 14px; }
+  a {
+    display: block;
+    font-size: 0.83rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 4px 0;
+    border-left: 2px solid transparent;
+    margin-left: -1px;
+    padding-left: 11px;
+  }
+  a:hover { color: var(--text); }
+  a[data-active="true"] {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    font-weight: 500;
+  }
+</style>
+
+<script>
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'));
+  if (links.length) {
+    const bySlug = new Map(links.map((l) => [l.dataset.slug, l]));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const slug = (entry.target as HTMLElement).id;
+          const link = bySlug.get(slug);
+          if (!link) continue;
+          if (entry.isIntersecting) {
+            links.forEach((l) => l.removeAttribute('data-active'));
+            link.setAttribute('data-active', 'true');
+          }
+        }
+      },
+      { rootMargin: '-80px 0px -70% 0px', threshold: 1.0 }
+    );
+    document.querySelectorAll('.prose h2, .prose h3').forEach((h) => observer.observe(h));
+  }
+</script>

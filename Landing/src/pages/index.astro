@@ -1,0 +1,191 @@
+---
+import Layout from '../layouts/Layout.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+
+const toc = [
+  { depth: 2, slug: 'como-funciona', text: 'Cómo funciona' },
+  { depth: 2, slug: 'frameworks', text: 'Frameworks soportados' },
+  { depth: 2, slug: 'el-problema', text: 'El problema que resuelve' },
+  { depth: 2, slug: 'costo', text: 'Por qué es gratis' },
+];
+---
+<Layout title="Introducción" description="Compilá Android e iOS desde Flutter, React Native o una PWA — gratis, sin necesitar una Mac.">
+  <div class="hero">
+    <p class="eyebrow">Workflow reutilizable · GitHub Actions</p>
+    <h1>No hace falta una Mac.</h1>
+    <p class="lead">
+      Un workflow reutilizable que compila tu app Flutter, React Native o PWA
+      para Android <strong>e</strong> iOS con cada push. El build de iOS corre en
+      un runner macOS gratuito de GitHub, en la nube — gratis, sin backend
+      propio, sin límite de equipos.
+    </p>
+    <div class="cta-row">
+      <a class="btn-primary" href="#como-funciona">Ver el quickstart</a>
+      <a class="btn-quiet" href="/docs/usage">Documentación completa →</a>
+    </div>
+  </div>
+
+  <h2 id="como-funciona">Cómo funciona</h2>
+  <p>
+    No es un servicio al que subís código: es un workflow reutilizable que vive
+    en este repo. Agregás esta referencia a tu propio
+    <code>.github/workflows/build.yml</code> y listo.
+  </p>
+
+  <pre class="astro-code manual-code"><code><span class="c"># .github/workflows/build.yml</span>
+<span class="k">jobs</span>:
+  <span class="k">build</span>:
+    <span class="k">uses</span>: <span class="s">shadownrx/code/.github/workflows/build-mobile.yml@main</span>
+    <span class="k">with</span>:
+      <span class="k">project_type</span>: <span class="s">auto</span>   <span class="c"># auto | flutter | react-native | pwa</span>
+    <span class="k">secrets</span>: <span class="s">inherit</span></code></pre>
+
+  <div class="steps">
+    <div class="step">
+      <span class="num">01</span>
+      <h3>Hacés push</h3>
+      <p>A tu rama principal, o abrís un PR — vos elegís el trigger.</p>
+    </div>
+    <div class="step">
+      <span class="num">02</span>
+      <h3>Corre en paralelo</h3>
+      <p>Android en un runner Linux, iOS en un runner macOS — ambos gratuitos.</p>
+    </div>
+    <div class="step">
+      <span class="num">03</span>
+      <h3>Descargás el resultado</h3>
+      <p>APK/AAB e IPA (o <code>.app</code> sin firmar) como artifacts.</p>
+    </div>
+  </div>
+
+  <h2 id="frameworks">Frameworks soportados</h2>
+  <div class="fw-grid">
+    <div class="fw-card">
+      <span class="badge">Flutter</span>
+      <p class="detect"><code>pubspec.yaml</code> → clave <strong>flutter:</strong></p>
+      <p class="out">Genera <code>.apk</code> + <code>.aab</code>, y <code>.ipa</code> o <code>.app</code>.</p>
+      <span class="pill-ok">Validado en CI</span>
+    </div>
+    <div class="fw-card">
+      <span class="badge">React Native</span>
+      <p class="detect"><code>package.json</code> → dependencia <strong>react-native</strong></p>
+      <p class="out">Gradle + CocoaPods estándar.</p>
+      <span class="pill-ok">Validado en CI</span>
+    </div>
+    <div class="fw-card">
+      <span class="badge">PWA · v1.2</span>
+      <p class="detect"><code>capacitor.config.ts</code> / <code>.json</code></p>
+      <p class="out">Empaqueta tu PWA con Capacitor — SPM en iOS, sin CocoaPods.</p>
+      <span class="pill-ok">Validado en CI</span>
+    </div>
+  </div>
+
+  <h2 id="el-problema">El problema que resuelve</h2>
+  <div class="compare">
+    <div>
+      <h4>Sin esta plataforma</h4>
+      <ul class="x-list">
+        <li>Compilar para iOS exige Xcode, y Xcode solo corre en macOS.</li>
+        <li>Sin una Mac en el equipo, esa mitad del trabajo queda bloqueada.</li>
+        <li>Coordinar acceso a la única Mac disponible del equipo.</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Con esta plataforma</h4>
+      <ul class="ok-list">
+        <li>El build de iOS corre en <code>macos-latest</code>, en la nube.</li>
+        <li>Cada repo usa sus propios minutos gratis de Actions.</li>
+        <li>Una sola línea <code>uses:</code> en tu propio workflow.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="costo">Por qué es gratis</h2>
+  <ul class="cost-list">
+    <li><strong>Repos públicos:</strong> minutos de GitHub Actions ilimitados, incluyendo runners macOS.</li>
+    <li><strong>Repos privados:</strong> cuota mensual gratis (macOS consume minutos a mayor tasa que Linux).</li>
+    <li><strong>Multi-equipo real:</strong> cada repo paga con sus propios minutos — nada que esta plataforma sostenga.</li>
+    <li><strong>Firma de iOS:</strong> requiere cuenta de Apple Developer (costo de Apple, no de la plataforma).</li>
+  </ul>
+
+  <TableOfContents slot="toc" headings={toc} />
+</Layout>
+
+<style>
+  .hero { padding-bottom: 8px; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin: 0 0 12px;
+  }
+  h1 { font-size: clamp(2rem, 4vw, 2.7rem); margin: 0; letter-spacing: -0.01em; }
+  .lead { font-size: 1.03rem; color: var(--text-secondary); max-width: 62ch; margin-top: 16px; }
+  .cta-row { display: flex; align-items: center; gap: 18px; margin-top: 24px; flex-wrap: wrap; }
+  .btn-primary {
+    font-size: 0.88rem; font-weight: 500;
+    background: var(--text); color: var(--bg);
+    padding: 10px 18px; border-radius: 7px;
+    text-decoration: none;
+  }
+  .btn-quiet { font-size: 0.88rem; color: var(--accent); text-decoration: none; }
+  .btn-quiet:hover { text-decoration: underline; }
+
+  pre.manual-code {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+  pre.manual-code :global(.k) { color: var(--accent); }
+  pre.manual-code :global(.s) { color: var(--ok); }
+  pre.manual-code :global(.c) { color: var(--text-tertiary); font-style: italic; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 12px; }
+  @media (max-width: 640px) { .steps { grid-template-columns: 1fr; } }
+  .step .num { font-family: var(--font-mono); color: var(--text-tertiary); font-size: 0.85rem; }
+  .step h3 { font-size: 0.95rem; margin: 6px 0 4px; }
+  .step p { font-size: 0.86rem; color: var(--text-secondary); margin: 0; }
+
+  .fw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .fw-grid { grid-template-columns: 1fr; } }
+  .fw-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 18px 20px;
+    display: flex; flex-direction: column; gap: 10px;
+    background: var(--bg-secondary);
+  }
+  .fw-card .badge {
+    font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--text-secondary); border: 1px solid var(--border-strong); border-radius: 20px;
+    padding: 2px 9px; width: fit-content;
+  }
+  .fw-card .detect, .fw-card .out { font-size: 0.84rem; color: var(--text-secondary); margin: 0; }
+  .fw-card .detect code { background: var(--bg); }
+  .pill-ok {
+    align-self: flex-start;
+    font-family: var(--font-mono); font-size: 0.72rem; color: var(--ok);
+    background: var(--ok-soft); border-radius: 20px; padding: 2px 9px;
+  }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  @media (max-width: 640px) { .compare { grid-template-columns: 1fr; } }
+  .compare > div { background: var(--bg); padding: 20px 20px 22px; }
+  .compare h4 { font-size: 0.9rem; margin: 0 0 12px; }
+  .compare ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .compare li { font-size: 0.87rem; color: var(--text-secondary); display: flex; gap: 8px; }
+  .x-list li::before { content: '×'; color: var(--text-tertiary); font-weight: 600; }
+  .ok-list li::before { content: '✓'; color: var(--ok); }
+
+  .cost-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
+  @media (max-width: 640px) { .cost-list { grid-template-columns: 1fr; } }
+  .cost-list li { font-size: 0.88rem; color: var(--text-secondary); padding-left: 20px; position: relative; }
+  .cost-list li::before { content: '✓'; position: absolute; left: 0; color: var(--ok); }
+</style>

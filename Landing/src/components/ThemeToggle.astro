@@ -1,0 +1,52 @@
+---
+---
+<button id="theme-toggle" class="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
+  <svg id="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.4"/>
+    <path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M8 1v1.6M8 13.4V15M15 8h-1.6M2.6 8H1M12.7 3.3l-1.1 1.1M4.4 11.6l-1.1 1.1M12.7 12.7l-1.1-1.1M4.4 4.4 3.3 3.3"/>
+  </svg>
+  <svg id="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="display:none;">
+    <path stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" d="M13.5 9.8A5.8 5.8 0 0 1 6.2 2.5 5.8 5.8 0 1 0 13.5 9.8Z"/>
+  </svg>
+</button>
+
+<style>
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .theme-toggle:hover { background: var(--bg-hover); color: var(--text); }
+</style>
+
+<script>
+  function activeTheme(): 'light' | 'dark' {
+    const stored = localStorage.getItem('theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function paintIcon(theme: 'light' | 'dark') {
+    const sun = document.getElementById('icon-sun');
+    const moon = document.getElementById('icon-moon');
+    if (!sun || !moon) return;
+    sun.style.display = theme === 'dark' ? 'none' : 'block';
+    moon.style.display = theme === 'dark' ? 'block' : 'none';
+  }
+
+  paintIcon(activeTheme());
+
+  document.getElementById('theme-toggle')?.addEventListener('click', () => {
+    const next: 'light' | 'dark' = activeTheme() === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    document.documentElement.setAttribute('data-theme', next);
+    paintIcon(next);
+  });
+</script>

@@ -1,0 +1,59 @@
+---
+import type { NavSection } from '../lib/nav';
+
+interface Props {
+  sections: NavSection[];
+  currentPath: string;
+}
+const { sections, currentPath } = Astro.props;
+
+function isActive(href: string, path: string) {
+  if (href === '/') return path === '/';
+  return path.startsWith(href);
+}
+---
+<nav class="sidebar" aria-label="Navegación de documentación">
+  {sections.map((s) => (
+    <div class="nav-section">
+      <p class="nav-heading">{s.section}</p>
+      <ul>
+        {s.items.map((item) => (
+          <li>
+            <a href={item.href} aria-current={isActive(item.href, currentPath) ? 'page' : undefined}>
+              {item.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</nav>
+
+<style>
+  .sidebar { padding: 28px 20px 40px; }
+  .nav-section + .nav-section { margin-top: 26px; }
+  .nav-heading {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    margin: 0 0 8px 10px;
+  }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  a {
+    display: block;
+    font-size: 0.87rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    line-height: 1.4;
+  }
+  a:hover { background: var(--bg-hover); color: var(--text); }
+  a[aria-current="page"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 500;
+  }
+</style>
