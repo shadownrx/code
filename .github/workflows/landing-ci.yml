@@ -1,0 +1,43 @@
+name: Landing (Astro site)
+
+# Builds the docs/landing site in Landing/ on every change, as a CI check —
+# catches broken content collections, bad frontmatter, or build errors before
+# they land on main.
+
+on:
+  push:
+    paths:
+      - "Landing/**"
+      - ".github/workflows/landing-ci.yml"
+  pull_request:
+    paths:
+      - "Landing/**"
+      - ".github/workflows/landing-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Landing
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: Landing/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      - name: astro build
+        run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: landing-dist
+          path: Landing/dist/
+          if-no-files-found: error
