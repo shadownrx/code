@@ -38,6 +38,48 @@ Con esto, cada push a `main` (o cada PR) compila automáticamente:
 - **iOS** (`.ipa` o un `.app` sin firmar) en un runner **macOS** de GitHub
   (`macos-latest`) — corre en la nube, así que **no necesitás una Mac física**.
 
+### Ejemplo real: React Native
+
+Este mismo repo incluye [`examples/react-native-demo`](../examples/react-native-demo),
+generado con `npx @react-native-community/cli init` (React Native 0.87) y usado para
+probar la plataforma en cada push. El workflow que lo compila es
+[`.github/workflows/example-react-native-ci.yml`](../.github/workflows/example-react-native-ci.yml):
+
+```yaml
+name: Example React Native app (self-test)
+
+on:
+  push:
+    paths:
+      - "examples/react-native-demo/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-mobile.yml
+    with:
+      project_type: react-native
+      working_directory: examples/react-native-demo
+    secrets: inherit
+```
+
+Puntos a tener en cuenta con un proyecto React Native real:
+
+- **Versión de Node**: React Native 0.81+ exige Node ≥ 22.11 (revisá `engines.node` en
+  tu `package.json`). El input `node_version` de la plataforma ya usa `22` por
+  defecto; si tu proyecto necesita otra versión, pasala explícitamente.
+- **`android/app/build.gradle`** (Groovy, no `.kts`, en la plantilla estándar de RN):
+  la firma opcional lee `key.properties` con el mismo patrón que Flutter — ver
+  [`examples/react-native-demo/android/app/build.gradle`](../examples/react-native-demo/android/app/build.gradle)
+  y [`SIGNING.md`](./SIGNING.md).
+- **`ios/Podfile`**: la plataforma corre `pod install` antes de compilar, así que no
+  hace falta commitear la carpeta `ios/Pods/` ni el `.xcworkspace` generado por
+  CocoaPods (ambos quedan afuera del repo vía `.gitignore`, como en cualquier
+  proyecto React Native).
+- **`android/gradlew`**: a diferencia de algunas plantillas de Flutter recientes, la
+  plantilla de React Native SÍ commitea el wrapper de Gradle por defecto — no hace
+  falta tocar nada ahí.
+
 ## 2. Descargar los resultados
 
 Al terminar la ejecución, entrá a la pestaña **Actions** de tu repo → la ejecución
@@ -82,7 +124,7 @@ listos para tiendas, configurá los secrets descritos en [`SIGNING.md`](./SIGNIN
 | `build_ios` | `true` | Compilar o no la parte iOS. |
 | `working_directory` | `.` | Ruta al proyecto, útil en monorepos. |
 | `flutter_channel` | `stable` | Versión/canal de Flutter. |
-| `node_version` | `20` | Versión de Node para React Native. |
+| `node_version` | `22` | Versión de Node para React Native. Revisá el campo `engines.node` de tu `package.json`: React Native 0.81+ requiere Node ≥ 22.11. |
 | `create_release` | `false` | Adjuntar artefactos a un GitHub Release cuando corre sobre un tag. |
 
 ## Por qué es gratis y multi-equipo

@@ -43,8 +43,9 @@ esta plataforma.
 ```
 .github/
   workflows/
-    build-mobile.yml         # el workflow reutilizable (el corazón de la plataforma)
-    example-flutter-ci.yml   # autotest: corre build-mobile.yml sobre examples/flutter-demo
+    build-mobile.yml             # el workflow reutilizable (el corazón de la plataforma)
+    example-flutter-ci.yml       # autotest: corre build-mobile.yml sobre examples/flutter-demo
+    example-react-native-ci.yml  # autotest: corre build-mobile.yml sobre examples/react-native-demo
   actions/
     detect-project/          # detecta si el repo consumidor es Flutter o React Native
 docs/
@@ -52,6 +53,7 @@ docs/
   SIGNING.md                 # cómo configurar firma de Android/iOS y notificaciones
 examples/
   flutter-demo/               # app Flutter mínima usada para probar la plataforma
+  react-native-demo/          # app React Native mínima usada para probar la plataforma
 ```
 
 ## Empezar
@@ -59,11 +61,13 @@ examples/
 1. Leé [`docs/USAGE.md`](docs/USAGE.md) para conectar tu repo Flutter o React Native.
 2. (Opcional) Leé [`docs/SIGNING.md`](docs/SIGNING.md) para builds firmados y
    notificaciones por Slack.
-3. Mirá [`examples/flutter-demo`](examples/flutter-demo) como referencia de un
-   proyecto Flutter ya configurado para esta plataforma (incluye la firma opcional
-   de Android en `android/app/build.gradle.kts`). Cada push a `examples/flutter-demo/**`
-   dispara `example-flutter-ci.yml`, que compila la app para Android e iOS como
-   prueba viva de que el pipeline funciona.
+3. Mirá los proyectos de ejemplo, ya configurados para esta plataforma (firma
+   opcional de Android incluida) — cada push a su carpeta dispara su propio
+   workflow y compila Android + iOS como prueba viva de que el pipeline funciona:
+   - [`examples/flutter-demo`](examples/flutter-demo) — Flutter, ver
+     `android/app/build.gradle.kts`, disparado por `example-flutter-ci.yml`.
+   - [`examples/react-native-demo`](examples/react-native-demo) — React Native, ver
+     `android/app/build.gradle`, disparado por `example-react-native-ci.yml`.
 
 ## Costo
 

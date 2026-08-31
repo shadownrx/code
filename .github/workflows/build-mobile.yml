@@ -34,7 +34,7 @@ on:
       node_version:
         type: string
         required: false
-        default: "20"
+        default: "22"
       create_release:
         description: "Attach build artifacts to a GitHub Release when the workflow runs on a tag push"
         type: boolean

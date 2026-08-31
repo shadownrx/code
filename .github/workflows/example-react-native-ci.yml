@@ -1,0 +1,28 @@
+name: Example React Native app (self-test)
+
+# Self-test for the reusable build-mobile.yml workflow: builds the sample
+# React Native app in examples/react-native-demo for Android and iOS on
+# every change to the platform itself or to the example app.
+
+on:
+  push:
+    paths:
+      - "examples/react-native-demo/**"
+      - ".github/workflows/build-mobile.yml"
+      - ".github/workflows/example-react-native-ci.yml"
+      - ".github/actions/detect-project/**"
+  pull_request:
+    paths:
+      - "examples/react-native-demo/**"
+      - ".github/workflows/build-mobile.yml"
+      - ".github/workflows/example-react-native-ci.yml"
+      - ".github/actions/detect-project/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-mobile.yml
+    with:
+      project_type: react-native
+      working_directory: examples/react-native-demo
+    secrets: inherit

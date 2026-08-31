@@ -60,9 +60,37 @@ usa la plataforma (`Settings → Secrets and variables → Actions`).
    }
    ```
 
-   Si tu proyecto todavía usa Groovy (`build.gradle` en vez de `build.gradle.kts`), el
-   mismo patrón aplica con sintaxis Groovy clásica (`keyAlias keystoreProperties['keyAlias']`,
-   etc.) — es el patrón oficial que documenta Flutter.
+   Si tu proyecto usa Groovy (`build.gradle` en vez de `build.gradle.kts`) — el caso de
+   la plantilla estándar de **React Native** — el mismo patrón se ve así. Ejemplo real
+   ya aplicado en
+   [`examples/react-native-demo/android/app/build.gradle`](../examples/react-native-demo/android/app/build.gradle):
+
+   ```groovy
+   def keystoreProperties = new Properties()
+   def keystorePropertiesFile = rootProject.file('key.properties')
+   if (keystorePropertiesFile.exists()) {
+       keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+   }
+
+   android {
+       signingConfigs {
+           debug { /* ... */ }
+           if (keystorePropertiesFile.exists()) {
+               release {
+                   keyAlias keystoreProperties['keyAlias']
+                   keyPassword keystoreProperties['keyPassword']
+                   storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                   storePassword keystoreProperties['storePassword']
+               }
+           }
+       }
+       buildTypes {
+           release {
+               signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+           }
+       }
+   }
+   ```
 
 Si estos secrets no están configurados, el build de Android simplemente se genera
 sin firma de release (firma debug por defecto de las plantillas de Flutter/RN).
