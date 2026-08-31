@@ -6,7 +6,7 @@ import path from 'node:path';
 import { buildWorkflowYaml, detectProjectType } from './lib.js';
 
 function tmpProject(files) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'create-mobile-ci-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shadownrx-code-'));
   for (const [name, content] of Object.entries(files)) {
     fs.writeFileSync(path.join(dir, name), content);
   }

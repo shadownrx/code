@@ -65,7 +65,8 @@ Landing/                       # sitio de docs/landing en Astro (vercel.com/docs
 
 ## Empezar
 
-**Opción rápida — asistente de terminal:** `node cli/bin.js` parado en tu
+**Opción rápida — asistente de terminal:** `npx shadownrx-code` (una vez
+publicado; por ahora, `node cli/bin.js` desde el repo clonado) parado en tu
 proyecto (Flutter, React Native o PWA) te hace un par de preguntas y te deja
 `.github/workflows/build.yml` ya escrito. Ver [`cli/README.md`](cli/README.md).
 

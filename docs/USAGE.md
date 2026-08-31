@@ -11,9 +11,10 @@ límites impuestos por esta plataforma.
 
 ## 1. Agregar el workflow a tu repo
 
-> Atajo: `node cli/bin.js` (parado en tu proyecto) te hace un par de preguntas
-> y escribe este archivo por vos — ver [`cli/README.md`](../cli/README.md).
-> Lo que sigue es el mismo resultado, a mano.
+> Atajo: `npx shadownrx-code` (una vez publicado; por ahora, `node cli/bin.js`
+> desde el repo clonado), parado en tu proyecto, te hace un par de preguntas y
+> escribe este archivo por vos — ver [`cli/README.md`](../cli/README.md). Lo
+> que sigue es el mismo resultado, a mano.
 
 Creá `.github/workflows/build.yml` en tu proyecto:
 

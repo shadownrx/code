@@ -1,4 +1,4 @@
-# create-mobile-ci
+# shadownrx-code
 
 Configurador interactivo de terminal para la plataforma de build de
 `shadownrx/code`. Detecta si tu proyecto es Flutter, React Native o una PWA
@@ -19,8 +19,19 @@ prepara el workflow que corre gratis en GitHub Actions.
 
 ## Usar
 
-Todavía no está publicado en npm (eso implicaría distribuirlo públicamente, así
-que quedó para cuando lo pidas explícitamente). Mientras tanto, corré:
+La idea es que, una vez publicado, alcance con:
+
+```bash
+npx shadownrx-code
+```
+
+parado en la raíz de tu proyecto (Flutter, React Native o PWA) — sin clonar
+nada. **Todavía no está publicado en npm** (publicarlo es distribuirlo
+públicamente, así que quedó pendiente de que lo pidas explícito — y hace falta
+una cuenta/token de npm que este entorno no tiene). El nombre `shadownrx-code`
+está libre en el registro — no se reserva hasta el primer `npm publish`.
+
+Mientras tanto, corré la versión local:
 
 ```bash
 git clone https://github.com/shadownrx/code
@@ -35,10 +46,6 @@ o, apuntando directo a la carpeta de tu proyecto:
 cd /ruta/a/tu/proyecto
 node /ruta/a/code/cli/bin.js
 ```
-
-Una vez publicado como paquete npm, correr `npx create-mobile-ci` (o
-`npm create mobile-ci`, por la convención `create-*` de npm) alcanzaría — sin
-clonar nada.
 
 ## Qué pregunta y por qué
 
