@@ -88,6 +88,24 @@ Es exactamente lo que se corrigió en
 [`examples/flutter-demo/android/.gitignore`](../examples/flutter-demo/android/.gitignore)
 al armar el ejemplo de esta plataforma.
 
+### `error: invalid source release: 21` compilando `capacitor-android`
+
+**Síntoma:** el job `build-android` falla en `gradlew assembleRelease
+bundleRelease` con `Execution failed for task
+':capacitor-android:compileReleaseJavaWithJavac'` y ese mensaje de "invalid
+source release".
+
+**Causa:** este fue un error real al probar el soporte de PWA/Capacitor —
+el módulo nativo `capacitor-android` (desde Capacitor 8) compila contra Java 21,
+pero la plataforma configuraba JDK 17 (heredado de cuando solo existían Flutter y
+React Native, que sí funcionan con 17). Java 17 no puede compilar código que pide
+`sourceCompatibility 21`.
+
+**Solución:** ya está corregido — `build-mobile.yml` usa JDK 21 para el job de
+Android (compatible hacia atrás con Flutter y React Native, así que no rompe los
+otros dos flujos). Si en el futuro Capacitor exige una versión aún más nueva,
+subí el `java-version` del paso `actions/setup-java@v4` en `build-android`.
+
 ### El APK/AAB sale sin firmar aunque configuré los secrets de Android
 
 **Síntoma:** el build compila bien, pero el artefacto sigue firmado con la clave

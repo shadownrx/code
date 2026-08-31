@@ -93,7 +93,9 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          # Capacitor 8's Android module compiles against Java 21; 21 is
+          # backward-compatible for Flutter/React Native's Gradle setup too.
+          java-version: "21"
 
       - name: Decode Android signing keystore (optional)
         if: env.HAS_ANDROID_KEYSTORE == 'true'
