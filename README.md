@@ -51,6 +51,7 @@ esta plataforma.
 docs/
   USAGE.md                   # cómo conectar tu repo, paso a paso
   SIGNING.md                 # cómo configurar firma de Android/iOS y notificaciones
+  TROUBLESHOOTING.md         # errores frecuentes (reales, ya vistos) y cómo resolverlos
 examples/
   flutter-demo/               # app Flutter mínima usada para probar la plataforma
   react-native-demo/          # app React Native mínima usada para probar la plataforma
@@ -68,6 +69,9 @@ examples/
      `android/app/build.gradle.kts`, disparado por `example-flutter-ci.yml`.
    - [`examples/react-native-demo`](examples/react-native-demo) — React Native, ver
      `android/app/build.gradle`, disparado por `example-react-native-ci.yml`.
+4. Si algo falla, mirá [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — reúne
+   los errores que ya aparecieron armando esta plataforma (y cómo se resolvieron),
+   no solo casos teóricos.
 
 ## Costo
 

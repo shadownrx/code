@@ -127,3 +127,8 @@ macOS, genera un `ExportOptions.plist` (método `ad-hoc` por defecto) y produce 
 
 - `SLACK_WEBHOOK_URL` (opcional): URL de un [Incoming Webhook de Slack](https://api.slack.com/messaging/webhooks)
   para recibir un mensaje con el resultado de cada build.
+
+## ¿Algo falló?
+
+Ver [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) — incluye los errores de firma más
+comunes (keystore mal configurado, Team ID incorrecto, etc.) con su solución.

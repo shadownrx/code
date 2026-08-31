@@ -136,3 +136,8 @@ listos para tiendas, configurá los secrets descritos en [`SIGNING.md`](./SIGNIN
   sin coordinarse entre sí ni compartir cuota — es aislamiento nativo de GitHub Actions.
 - El runner `macos-latest` es lo que elimina la necesidad de tener una Mac física para
   compilar iOS.
+
+## ¿Algo falló?
+
+Ver [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) — errores reales que ya aparecieron
+(no solo teóricos) con su causa y solución.
