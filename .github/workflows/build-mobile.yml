@@ -295,8 +295,10 @@ jobs:
     needs: [build-android, build-ios]
     if: always() && (needs.build-android.result != 'skipped' || needs.build-ios.result != 'skipped')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    # No permissions block here: a reusable workflow can only request
+    # permissions the caller already grants. Repos that set create_release:
+    # true must add `permissions: contents: write` in their own caller
+    # workflow (see docs/USAGE.md) so the release step below can push tags.
     env:
       HAS_SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
     steps:

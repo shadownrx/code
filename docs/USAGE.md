@@ -58,7 +58,20 @@ listos para tiendas, configurá los secrets descritos en [`SIGNING.md`](./SIGNIN
 - Si agregás el secret `SLACK_WEBHOOK_URL`, además se manda un mensaje a Slack con el
   resultado y el link a la ejecución.
 - Si activás `create_release: true` y el workflow corre sobre un tag (`v1.2.3`), los
-  artefactos se adjuntan automáticamente a un GitHub Release.
+  artefactos se adjuntan automáticamente a un GitHub Release. Para esto tu workflow
+  llamador necesita otorgar permiso de escritura explícitamente (una reusable workflow
+  no puede pedir más permisos de los que el llamador le da):
+
+  ```yaml
+  jobs:
+    build:
+      permissions:
+        contents: write
+      uses: shadownrx/code/.github/workflows/build-mobile.yml@main
+      with:
+        create_release: true
+      secrets: inherit
+  ```
 
 ## Inputs disponibles
 
