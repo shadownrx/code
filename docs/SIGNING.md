@@ -22,32 +22,47 @@ usa la plataforma (`Settings → Secrets and variables → Actions`).
    - `ANDROID_KEY_PASSWORD`
 
 4. El workflow decodifica el keystore en `android/keystore/release.jks` y escribe
-   `android/key.properties`. Para que Gradle lo use, tu `android/app/build.gradle`
-   debe leer ese archivo (patrón estándar de Flutter/React Native):
+   `android/key.properties`. Para que Gradle lo use, tu `android/app/build.gradle.kts`
+   (Kotlin DSL, la plantilla actual de Flutter) debe leer ese archivo — ver
+   [`examples/flutter-demo/android/app/build.gradle.kts`](../examples/flutter-demo/android/app/build.gradle.kts)
+   para el patrón completo ya aplicado:
 
-   ```groovy
-   def keystoreProperties = new Properties()
-   def keystorePropertiesFile = rootProject.file('key.properties')
+   ```kotlin
+   import java.io.FileInputStream
+   import java.util.Properties
+
+   val keystoreProperties = Properties()
+   val keystorePropertiesFile = rootProject.file("key.properties")
    if (keystorePropertiesFile.exists()) {
-       keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+       keystoreProperties.load(FileInputStream(keystorePropertiesFile))
    }
 
    android {
        signingConfigs {
-           release {
-               keyAlias keystoreProperties['keyAlias']
-               keyPassword keystoreProperties['keyPassword']
-               storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-               storePassword keystoreProperties['storePassword']
+           if (keystorePropertiesFile.exists()) {
+               create("release") {
+                   keyAlias = keystoreProperties["keyAlias"] as String?
+                   keyPassword = keystoreProperties["keyPassword"] as String?
+                   storeFile = (keystoreProperties["storeFile"] as String?)?.let { file(it) }
+                   storePassword = keystoreProperties["storePassword"] as String?
+               }
            }
        }
        buildTypes {
            release {
-               signingConfig signingConfigs.release
+               signingConfig = if (keystorePropertiesFile.exists()) {
+                   signingConfigs.getByName("release")
+               } else {
+                   signingConfigs.getByName("debug")
+               }
            }
        }
    }
    ```
+
+   Si tu proyecto todavía usa Groovy (`build.gradle` en vez de `build.gradle.kts`), el
+   mismo patrón aplica con sintaxis Groovy clásica (`keyAlias keystoreProperties['keyAlias']`,
+   etc.) — es el patrón oficial que documenta Flutter.
 
 Si estos secrets no están configurados, el build de Android simplemente se genera
 sin firma de release (firma debug por defecto de las plantillas de Flutter/RN).

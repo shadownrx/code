@@ -1,0 +1,28 @@
+name: Example Flutter app (self-test)
+
+# Self-test for the reusable build-mobile.yml workflow: builds the sample
+# Flutter app in examples/flutter-demo for Android and iOS on every change
+# to the platform itself or to the example app.
+
+on:
+  push:
+    paths:
+      - "examples/flutter-demo/**"
+      - ".github/workflows/build-mobile.yml"
+      - ".github/workflows/example-flutter-ci.yml"
+      - ".github/actions/detect-project/**"
+  pull_request:
+    paths:
+      - "examples/flutter-demo/**"
+      - ".github/workflows/build-mobile.yml"
+      - ".github/workflows/example-flutter-ci.yml"
+      - ".github/actions/detect-project/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-mobile.yml
+    with:
+      project_type: flutter
+      working_directory: examples/flutter-demo
+    secrets: inherit

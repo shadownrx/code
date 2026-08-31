@@ -43,12 +43,15 @@ esta plataforma.
 ```
 .github/
   workflows/
-    build-mobile.yml       # el workflow reutilizable (el corazón de la plataforma)
+    build-mobile.yml         # el workflow reutilizable (el corazón de la plataforma)
+    example-flutter-ci.yml   # autotest: corre build-mobile.yml sobre examples/flutter-demo
   actions/
-    detect-project/        # detecta si el repo consumidor es Flutter o React Native
+    detect-project/          # detecta si el repo consumidor es Flutter o React Native
 docs/
-  USAGE.md                 # cómo conectar tu repo, paso a paso
-  SIGNING.md                # cómo configurar firma de Android/iOS y notificaciones
+  USAGE.md                   # cómo conectar tu repo, paso a paso
+  SIGNING.md                 # cómo configurar firma de Android/iOS y notificaciones
+examples/
+  flutter-demo/               # app Flutter mínima usada para probar la plataforma
 ```
 
 ## Empezar
@@ -56,6 +59,11 @@ docs/
 1. Leé [`docs/USAGE.md`](docs/USAGE.md) para conectar tu repo Flutter o React Native.
 2. (Opcional) Leé [`docs/SIGNING.md`](docs/SIGNING.md) para builds firmados y
    notificaciones por Slack.
+3. Mirá [`examples/flutter-demo`](examples/flutter-demo) como referencia de un
+   proyecto Flutter ya configurado para esta plataforma (incluye la firma opcional
+   de Android en `android/app/build.gradle.kts`). Cada push a `examples/flutter-demo/**`
+   dispara `example-flutter-ci.yml`, que compila la app para Android e iOS como
+   prueba viva de que el pipeline funciona.
 
 ## Costo
 
