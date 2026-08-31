@@ -85,6 +85,8 @@ jobs:
     needs: detect
     if: inputs.build_android && needs.detect.outputs.project_type != 'unknown'
     runs-on: ubuntu-latest
+    env:
+      HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -94,7 +96,7 @@ jobs:
           java-version: "17"
 
       - name: Decode Android signing keystore (optional)
-        if: secrets.ANDROID_KEYSTORE_BASE64 != ''
+        if: env.HAS_ANDROID_KEYSTORE == 'true'
         working-directory: ${{ inputs.working_directory }}
         run: |
           mkdir -p android/keystore
@@ -295,6 +297,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      HAS_SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -316,7 +320,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Notify Slack (optional)
-        if: secrets.SLACK_WEBHOOK_URL != ''
+        if: env.HAS_SLACK_WEBHOOK == 'true'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
