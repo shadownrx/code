@@ -1,0 +1,31 @@
+name: "Detect mobile project type"
+description: "Detects whether a repository is a Flutter or React Native project"
+
+inputs:
+  working-directory:
+    description: "Directory to inspect"
+    required: false
+    default: "."
+
+outputs:
+  project_type:
+    description: "flutter | react-native | unknown"
+    value: ${{ steps.detect.outputs.project_type }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: detect
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -f "pubspec.yaml" ] && grep -qE "^\s*flutter:" pubspec.yaml; then
+          echo "Detected: Flutter project"
+          echo "project_type=flutter" >> "$GITHUB_OUTPUT"
+        elif [ -f "package.json" ] && grep -q '"react-native"' package.json; then
+          echo "Detected: React Native project"
+          echo "project_type=react-native" >> "$GITHUB_OUTPUT"
+        else
+          echo "::warning::Could not auto-detect project type (no pubspec.yaml with flutter:, no package.json with react-native)"
+          echo "project_type=unknown" >> "$GITHUB_OUTPUT"
+        fi
