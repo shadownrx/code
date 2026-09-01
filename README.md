@@ -60,7 +60,11 @@ esta plataforma.
   actions/
     detect-project/          # detecta si el repo consumidor es Flutter, React Native, PWA o Electron
 docs/
-  USAGE.md                   # cómo conectar tu repo, paso a paso
+  USAGE.md                   # cómo conectar tu repo, paso a paso (genérico)
+  FLUTTER.md                 # guía específica de Flutter
+  REACT-NATIVE.md            # guía específica de React Native
+  PWA.md                     # guía específica de PWA (Capacitor)
+  ELECTRON.md                # guía específica de Electron
   SIGNING.md                 # cómo configurar firma de Android/iOS y notificaciones
   TROUBLESHOOTING.md         # errores frecuentes (reales, ya vistos) y cómo resolverlos
 examples/
@@ -82,13 +86,15 @@ proyecto (Flutter, React Native o PWA) te hace un par de preguntas y te deja
 
 **Manual:**
 
-1. Leé [`docs/USAGE.md`](docs/USAGE.md) para conectar tu repo Flutter, React Native
-   o una PWA.
+1. Leé [`docs/USAGE.md`](docs/USAGE.md) para el flujo general, y después la guía
+   de tu framework: [`FLUTTER.md`](docs/FLUTTER.md),
+   [`REACT-NATIVE.md`](docs/REACT-NATIVE.md), [`PWA.md`](docs/PWA.md) o
+   [`ELECTRON.md`](docs/ELECTRON.md).
 2. (Opcional) Leé [`docs/SIGNING.md`](docs/SIGNING.md) para builds firmados y
    notificaciones por Slack.
 3. Mirá los proyectos de ejemplo, ya configurados para esta plataforma (firma
    opcional de Android incluida) — cada push a su carpeta dispara su propio
-   workflow y compila Android + iOS como prueba viva de que el pipeline funciona:
+   workflow y compila como prueba viva de que el pipeline funciona:
    - [`examples/flutter-demo`](examples/flutter-demo) — Flutter, ver
      `android/app/build.gradle.kts`, disparado por `example-flutter-ci.yml`.
    - [`examples/react-native-demo`](examples/react-native-demo) — React Native, ver
