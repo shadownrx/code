@@ -1,13 +1,13 @@
 # shadownrx-code
 
 Configurador interactivo de terminal para la plataforma de build de
-`shadownrx/code`. Detecta si tu proyecto es Flutter, React Native o una PWA
-(Capacitor), te hace un par de preguntas, y te escribe
+`shadownrx/code`. Detecta si tu proyecto es Flutter, React Native, una PWA
+(Capacitor) o Electron, te hace un par de preguntas, y te escribe
 `.github/workflows/build.yml` ya configurado — no compila nada localmente, solo
 prepara el workflow que corre gratis en GitHub Actions.
 
 ```
-▲ shadownrx/code — configurador de CI para Android + iOS
+▲ shadownrx/code — configurador de CI para Android, iOS y Electron
 
 ? Detecté un proyecto React Native en este directorio. ¿Es correcto? › Yes
 ? ¿Qué deseas compilar? › Android + iOS (ambas)
@@ -17,6 +17,11 @@ prepara el workflow que corre gratis en GitHub Actions.
 ✔ Escribí .github/workflows/build.yml
 ```
 
+Para Electron, la pregunta "¿Qué deseas compilar?" y la de firma no aparecen
+(Electron siempre compila Linux + macOS + Windows, y la firma todavía no está
+soportada) — solo pregunta el tipo de proyecto y si querés adjuntar a un
+GitHub Release.
+
 ## Usar
 
 La idea es que, una vez publicado, alcance con:
@@ -25,8 +30,8 @@ La idea es que, una vez publicado, alcance con:
 npx shadownrx-code
 ```
 
-parado en la raíz de tu proyecto (Flutter, React Native o PWA) — sin clonar
-nada. **Todavía no está publicado en npm** (publicarlo es distribuirlo
+parado en la raíz de tu proyecto (Flutter, React Native, PWA o Electron) — sin
+clonar nada. **Todavía no está publicado en npm** (publicarlo es distribuirlo
 públicamente, así que quedó pendiente de que lo pidas explícito — y hace falta
 una cuenta/token de npm que este entorno no tiene). El nombre `shadownrx-code`
 está libre en el registro — no se reserva hasta el primer `npm publish`.
@@ -57,8 +62,11 @@ opción que prometa algo que la plataforma no haga. Ver
 | Pregunta | Input generado |
 |---|---|
 | Tipo de proyecto (auto-detectado o elegido) | `project_type` |
-| Qué compilar (Android / iOS / ambas) | `build_android`, `build_ios` |
+| Qué compilar (Android / iOS / ambas) — no aplica a Electron | `build_android`, `build_ios` |
 | ¿Adjuntar a un GitHub Release en tags? | `create_release` (+ el bloque `permissions: contents: write` que necesita) |
+
+Para Electron, en vez de `build_android`/`build_ios` se emite
+`build_electron: true` (siempre compila los tres sistemas operativos).
 
 Si respondés que ya tenés los secrets de firma listos, te lista los nombres
 exactos que hay que cargar en GitHub y te manda a `docs/SIGNING.md` — no los

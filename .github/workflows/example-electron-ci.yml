@@ -1,0 +1,28 @@
+name: Example Electron app (self-test)
+
+# Self-test for the reusable build-mobile.yml workflow: builds the sample
+# Electron app in examples/electron-demo for Linux, macOS, and Windows on
+# every change to the platform itself or to the example app.
+
+on:
+  push:
+    paths:
+      - "examples/electron-demo/**"
+      - ".github/workflows/build-mobile.yml"
+      - ".github/workflows/example-electron-ci.yml"
+      - ".github/actions/detect-project/**"
+  pull_request:
+    paths:
+      - "examples/electron-demo/**"
+      - ".github/workflows/build-mobile.yml"
+      - ".github/workflows/example-electron-ci.yml"
+      - ".github/actions/detect-project/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-mobile.yml
+    with:
+      project_type: electron
+      working_directory: examples/electron-demo
+    secrets: inherit

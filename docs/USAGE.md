@@ -2,9 +2,10 @@
 
 Esta plataforma no es un servicio al que subís código: es un **workflow reutilizable
 de GitHub Actions** que vive en este repo (`shadownrx/code`). Cualquier equipo con
-un proyecto **Flutter**, **React Native**, o una **PWA** (empaquetada con
-[Capacitor](https://capacitorjs.com)) en GitHub lo activa agregando un archivo de
-una sola línea de `uses:` a su propio repositorio. Cada equipo/repo queda
+un proyecto **Flutter**, **React Native**, una **PWA** (empaquetada con
+[Capacitor](https://capacitorjs.com)), o una app de escritorio **Electron** en
+GitHub lo activa agregando un archivo de una sola línea de `uses:` a su propio
+repositorio. Cada equipo/repo queda
 completamente aislado: usa sus propios minutos gratis de Actions, sus propios
 secretos y sus propios artefactos. No hay backend compartido, ni cuentas, ni
 límites impuestos por esta plataforma.
@@ -31,7 +32,7 @@ jobs:
   build:
     uses: shadownrx/code/.github/workflows/build-mobile.yml@main
     with:
-      project_type: auto        # auto | flutter | react-native | pwa
+      project_type: auto        # auto | flutter | react-native | pwa | electron
       build_android: true
       build_ios: true
     secrets: inherit            # pasa tus secrets (firma, Slack, etc.) si los configuraste
@@ -43,6 +44,9 @@ Con esto, cada push a `main` (o cada PR) compila automáticamente:
   en repos públicos; con cuota mensual gratis en privados).
 - **iOS** (`.ipa` o un `.app` sin firmar) en un runner **macOS** de GitHub
   (`macos-latest`) — corre en la nube, así que **no necesitás una Mac física**.
+- Si `project_type` es `electron`, en cambio, corre **`build-electron`**: Linux +
+  macOS + Windows en paralelo (`.AppImage`, `.dmg`, `.exe`) — tampoco necesitás
+  esas máquinas.
 
 ### Ejemplo real: React Native
 
@@ -148,12 +152,69 @@ Puntos a tener en cuenta:
   ver [`examples/pwa-demo/android/app/build.gradle`](../examples/pwa-demo/android/app/build.gradle)
   y [`SIGNING.md`](./SIGNING.md).
 
+### Ejemplo real: Electron — v1.3
+
+Este mismo repo incluye [`examples/electron-demo`](../examples/electron-demo):
+una app Electron mínima (`main.js` + `preload.js` + `index.html`, sin bundler)
+empaquetada con [electron-builder](https://www.electron.build). El workflow que
+la compila es
+[`.github/workflows/example-electron-ci.yml`](../.github/workflows/example-electron-ci.yml):
+
+```yaml
+name: Example Electron app (self-test)
+
+on:
+  push:
+    paths:
+      - "examples/electron-demo/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-mobile.yml
+    with:
+      project_type: electron
+      working_directory: examples/electron-demo
+    secrets: inherit
+```
+
+Cómo conectar tu propia app Electron:
+
+1. Necesitás `electron` y `electron-builder` como `devDependencies`, y una
+   config `build` en tu `package.json` (`appId`, `productName`,
+   `directories.output`, targets por SO). Ver
+   [`examples/electron-demo/package.json`](../examples/electron-demo/package.json)
+   para una config mínima real que funciona.
+2. **Agregá `"publish": null` a la config `build`** — sin esto, `electron-builder`
+   intenta generar metadata de auto-actualización incluso con `--publish=never`
+   y explota con `Cannot read properties of null (reading 'provider')` si tu
+   `package.json` no tiene un campo `repository`. Es un bug real que encontramos
+   armando el ejemplo — ver [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md).
+3. Apuntá `working_directory` a la carpeta de tu proyecto y usá
+   `project_type: electron` (o dejá `auto`: la plataforma lo detecta por la
+   dependencia `electron`/`electron-builder` en `package.json`).
+
+Puntos a tener en cuenta:
+
+- **Un solo job, tres sistemas operativos**: `build-electron` es un `matrix` que
+  corre en `ubuntu-latest`, `macos-latest` y `windows-latest` a la vez — cada uno
+  empaqueta el target nativo de su propio SO (nada de cross-compilar con Wine).
+  Se suben como tres artifacts separados (`electron-build-ubuntu-latest`, etc.).
+- **La plataforma corre `npm run build --if-present`** antes de
+  `electron-builder`, igual que en PWA — si tu app tiene un proceso de renderer
+  con bundler, asegurate de que el script `build` lo genere.
+- **Sin firma todavía**: los builds de macOS y Windows salen sin firmar
+  (`CSC_IDENTITY_AUTO_DISCOVERY=false` evita que `electron-builder` intente usar
+  una identidad ad-hoc del runner). Firmar Electron es un paso pendiente — no
+  está en [`SIGNING.md`](./SIGNING.md) todavía.
+
 ## 2. Descargar los resultados
 
 Al terminar la ejecución, entrá a la pestaña **Actions** de tu repo → la ejecución
 correspondiente → sección **Artifacts**: ahí están `android-build` (APK/AAB) e
-`ios-build` (IPA o `.app` comprimido). El resumen (`Summary`) de la ejecución
-también muestra el estado de cada plataforma.
+`ios-build` (IPA o `.app` comprimido), o —para Electron— `electron-build-ubuntu-latest`,
+`electron-build-macos-latest` y `electron-build-windows-latest`. El resumen
+(`Summary`) de la ejecución también muestra el estado de cada plataforma.
 
 ## 3. Firma de apps (opcional)
 
@@ -187,12 +248,13 @@ listos para tiendas, configurá los secrets descritos en [`SIGNING.md`](./SIGNIN
 
 | Input | Default | Descripción |
 |---|---|---|
-| `project_type` | `auto` | `auto`, `flutter`, `react-native` o `pwa`. `auto` detecta el tipo leyendo `pubspec.yaml`, `capacitor.config.ts`/`.json`, o `package.json`. |
-| `build_android` | `true` | Compilar o no la parte Android. |
-| `build_ios` | `true` | Compilar o no la parte iOS. |
+| `project_type` | `auto` | `auto`, `flutter`, `react-native`, `pwa` o `electron`. `auto` detecta el tipo leyendo `pubspec.yaml`, `capacitor.config.ts`/`.json`, o `package.json`. |
+| `build_android` | `true` | Compilar o no la parte Android. Ignorado si `project_type` es `electron`. |
+| `build_ios` | `true` | Compilar o no la parte iOS. Ignorado si `project_type` es `electron`. |
+| `build_electron` | `true` | Compilar o no Electron (Linux + macOS + Windows). Solo aplica si `project_type` es `electron`. |
 | `working_directory` | `.` | Ruta al proyecto, útil en monorepos. |
 | `flutter_channel` | `stable` | Versión/canal de Flutter. |
-| `node_version` | `22` | Versión de Node para React Native. Revisá el campo `engines.node` de tu `package.json`: React Native 0.81+ requiere Node ≥ 22.11. |
+| `node_version` | `22` | Versión de Node para React Native, PWA y Electron. Revisá el campo `engines.node` de tu `package.json`: React Native 0.81+ requiere Node ≥ 22.11. |
 | `create_release` | `false` | Adjuntar artefactos a un GitHub Release cuando corre sobre un tag. |
 
 ## Por qué es gratis y multi-equipo
@@ -203,7 +265,8 @@ listos para tiendas, configurá los secrets descritos en [`SIGNING.md`](./SIGNIN
 - Cualquier cantidad de repos/equipos puede apuntar a este mismo workflow reutilizable
   sin coordinarse entre sí ni compartir cuota — es aislamiento nativo de GitHub Actions.
 - El runner `macos-latest` es lo que elimina la necesidad de tener una Mac física para
-  compilar iOS.
+  compilar iOS (o un Electron para macOS); `windows-latest` hace lo mismo para el
+  target de Windows de Electron.
 
 ## ¿Algo falló?
 

@@ -1,8 +1,10 @@
-name: Build Mobile (Android + iOS)
+name: Build Mobile (Android + iOS + Electron)
 
 # Reusable workflow: any repo can call this with a one-line `uses:` to get
 # Android + iOS builds, without owning a Mac, entirely on GitHub's free
-# hosted runners (macos-latest handles the iOS build in the cloud).
+# hosted runners (macos-latest handles the iOS build in the cloud). Also
+# builds Electron desktop apps for Linux/macOS/Windows the same way — no
+# Mac or Windows machine required either.
 #
 # See docs/USAGE.md for how a team wires this into their own repository.
 
@@ -10,7 +12,7 @@ on:
   workflow_call:
     inputs:
       project_type:
-        description: "auto | flutter | react-native | pwa"
+        description: "auto | flutter | react-native | pwa | electron"
         type: string
         required: false
         default: "auto"
@@ -19,6 +21,11 @@ on:
         required: false
         default: true
       build_ios:
+        type: boolean
+        required: false
+        default: true
+      build_electron:
+        description: "Only applies when project_type is electron. Builds Linux, macOS, and Windows in parallel."
         type: boolean
         required: false
         default: true
@@ -83,7 +90,7 @@ jobs:
 
   build-android:
     needs: detect
-    if: inputs.build_android && needs.detect.outputs.project_type != 'unknown'
+    if: inputs.build_android && needs.detect.outputs.project_type != 'unknown' && needs.detect.outputs.project_type != 'electron'
     runs-on: ubuntu-latest
     env:
       HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
@@ -192,7 +199,7 @@ jobs:
 
   build-ios:
     needs: detect
-    if: inputs.build_ios && needs.detect.outputs.project_type != 'unknown'
+    if: inputs.build_ios && needs.detect.outputs.project_type != 'unknown' && needs.detect.outputs.project_type != 'electron'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -364,9 +371,66 @@ jobs:
           path: ${{ inputs.working_directory }}/ios-artifacts/*
           if-no-files-found: warn
 
+  build-electron:
+    needs: detect
+    if: inputs.build_electron && needs.detect.outputs.project_type == 'electron'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
+
+      - name: npm ci
+        working-directory: ${{ inputs.working_directory }}
+        run: npm ci
+
+      - name: Build renderer (if present)
+        working-directory: ${{ inputs.working_directory }}
+        run: npm run build --if-present
+
+      # Unsigned by default (CSC_IDENTITY_AUTO_DISCOVERY=false stops
+      # electron-builder from picking up an ad-hoc macOS identity on the
+      # runner). Signing secrets aren't wired up yet — see docs/SIGNING.md.
+      - name: electron-builder
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --publish=never
+
+      - name: Collect Electron artifacts
+        working-directory: ${{ inputs.working_directory }}
+        shell: bash
+        run: |
+          mkdir -p electron-artifacts
+          find dist -maxdepth 1 -type f \( \
+            -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o \
+            -name "*.deb" -o -name "*.rpm" -o -name "*.exe" -o \
+            -name "*.msi" -o -name "*.snap" \) \
+            -exec cp {} electron-artifacts/ \; 2>/dev/null || true
+          ls -la electron-artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electron-build-${{ matrix.os }}
+          path: ${{ inputs.working_directory }}/electron-artifacts/*
+          if-no-files-found: warn
+
   notify:
-    needs: [build-android, build-ios]
-    if: always() && (needs.build-android.result != 'skipped' || needs.build-ios.result != 'skipped')
+    needs: [build-android, build-ios, build-electron]
+    if: |
+      always() && (
+        needs.build-android.result != 'skipped' ||
+        needs.build-ios.result != 'skipped' ||
+        needs.build-electron.result != 'skipped'
+      )
     runs-on: ubuntu-latest
     # No permissions block here: a reusable workflow can only request
     # permissions the caller already grants. Repos that set create_release:
@@ -389,6 +453,7 @@ jobs:
             echo "|---|---|"
             echo "| Android | ${{ needs.build-android.result || 'skipped' }} |"
             echo "| iOS | ${{ needs.build-ios.result || 'skipped' }} |"
+            echo "| Electron | ${{ needs.build-electron.result || 'skipped' }} |"
             echo ""
             echo "Artefactos disponibles en la pestaña **Artifacts** de esta ejecución:"
             echo "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -400,7 +465,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           curl -sS -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"Build ${{ github.repository }}@${{ github.ref_name }}: Android=${{ needs.build-android.result || 'skipped' }} iOS=${{ needs.build-ios.result || 'skipped' }} — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            --data "{\"text\":\"Build ${{ github.repository }}@${{ github.ref_name }}: Android=${{ needs.build-android.result || 'skipped' }} iOS=${{ needs.build-ios.result || 'skipped' }} Electron=${{ needs.build-electron.result || 'skipped' }} — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
             "$SLACK_WEBHOOK_URL"
 
       - name: Attach artifacts to GitHub Release (optional, tags only)

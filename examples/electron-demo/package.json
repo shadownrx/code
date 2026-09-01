@@ -1,0 +1,36 @@
+{
+  "name": "electron-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Electron app used to test the shadownrx/code build platform.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish=never"
+  },
+  "author": "shadownrx",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.shadownrx.electrondemo",
+    "productName": "Electron Demo",
+    "directories": {
+      "output": "dist"
+    },
+    "publish": null,
+    "files": ["main.js", "preload.js", "index.html"],
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility"
+    },
+    "mac": {
+      "target": ["dmg"]
+    },
+    "win": {
+      "target": ["nsis"]
+    }
+  }
+}

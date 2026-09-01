@@ -208,20 +208,60 @@ intencional, para no romper el pipeline por una config incompleta).
 el perfil de aprovisionamiento — un Team ID incorrecto hace que `xcodebuild
 -exportArchive` falle igual, ya con los certificados importados.
 
+## Errores de build de Electron
+
+### `⨯ Cannot read properties of null (reading 'provider')`
+
+**Síntoma:** el job `build-electron` falla justo después de empaquetar, con ese
+mensaje y `failedTask=build`, sin llegar a generar el `.AppImage`/`.dmg`/`.exe`.
+Suele venir precedido de `Cannot detect repository by .git/config. Please
+specify "repository" in the package.json`.
+
+**Causa:** este fue un error real armando el ejemplo de este repo. Aunque el
+workflow corre `electron-builder --publish=never`, algunas versiones de
+`electron-builder` igual intentan construir la metadata de auto-actualización
+(`updateInfoBuilder`) para targets que la soportan (AppImage, NSIS, DMG) cuando
+no hay un `publish` explícito en la config y no puede inferir el repositorio
+desde `package.json`/`.git` — y esa construcción revienta con un `null`.
+
+**Solución:** agregá `"publish": null` dentro de la config `build` de tu
+`package.json`. Esto le dice a `electron-builder` que no genere metadata de
+publicación/auto-actualización en absoluto — ver el fix real aplicado en
+[`examples/electron-demo/package.json`](../examples/electron-demo/package.json).
+Alternativa (no la que usamos): agregar un campo `"repository"` real al
+`package.json` también evita el crash, pero `publish: null` es más explícito
+sobre la intención (no queremos auto-updates).
+
+### No aparecen `.dmg`/`.exe`/`.AppImage` en los artifacts
+
+**Causa:** el paso "Collect Electron artifacts" busca en `dist/` (la carpeta de
+salida por defecto de `electron-builder`, configurable vía
+`build.directories.output`) archivos con esas extensiones. Si tu `build.<os>.target`
+no genera ninguno de los formatos que busca (`dmg`, `zip`, `AppImage`, `deb`,
+`rpm`, `exe`, `msi`, `snap`), o si cambiaste `directories.output`, no encuentra
+nada — el paso de subida usa `if-no-files-found: warn`, así que el job sigue en
+verde igual.
+
+**Solución:** revisá que `build.linux.target`/`build.mac.target`/`build.win.target`
+en tu `package.json` usen alguno de esos formatos, o pedí que se agregue el que
+te falta a la lista de extensiones que busca `build-mobile.yml`.
+
 ## El proyecto no se detecta (`project_type: unknown`)
 
-**Síntoma:** los jobs `build-android`/`build-ios` aparecen como `skipped` en vez
-de correr.
+**Síntoma:** los jobs `build-android`/`build-ios`/`build-electron` aparecen como
+`skipped` en vez de correr.
 
 **Causa:** con `project_type: auto` (el default), la plataforma busca
 `pubspec.yaml` con una clave `flutter:`, un `capacitor.config.ts`/`.json`, o
-`package.json` con la dependencia `"react-native"` **en la raíz de
-`working_directory`**. Si tu proyecto está en un monorepo y `working_directory`
-no apunta exactamente a esa carpeta, no lo encuentra.
+`package.json` con la dependencia `"electron"`/`"electron-builder"` o
+`"react-native"` **en la raíz de `working_directory`**. Si tu proyecto está en un
+monorepo y `working_directory` no apunta exactamente a esa carpeta, no lo
+encuentra.
 
 **Solución:** ajustá `working_directory` para que apunte a la carpeta donde
 realmente están `pubspec.yaml`/`capacitor.config.*`/`package.json`, o fijá
-`project_type: flutter` / `react-native` / `pwa` explícitamente en vez de `auto`.
+`project_type: flutter` / `react-native` / `pwa` / `electron` explícitamente en
+vez de `auto`.
 
 ## No aparecen artefactos para descargar
 

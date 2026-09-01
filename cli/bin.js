@@ -18,7 +18,7 @@ function onCancel() {
 }
 
 async function main() {
-  console.log('\n▲ shadownrx/code — configurador de CI para Android + iOS\n');
+  console.log('\n▲ shadownrx/code — configurador de CI para Android, iOS y Electron\n');
   console.log('Esto escribe .github/workflows/build.yml en este proyecto. No compila nada');
   console.log('acá: el build corre gratis en GitHub Actions con cada push.\n');
 
@@ -48,6 +48,7 @@ async function main() {
           { title: 'Flutter', value: 'flutter' },
           { title: 'React Native', value: 'react-native' },
           { title: 'PWA (Capacitor)', value: 'pwa' },
+          { title: 'Electron', value: 'electron' },
           { title: 'Detectar automáticamente en cada build', value: 'auto' },
         ],
       },
@@ -56,29 +57,43 @@ async function main() {
     projectType = picked;
   }
 
-  const { target } = await prompts(
-    {
-      type: 'select',
-      name: 'target',
-      message: '¿Qué deseas compilar?',
-      choices: [
-        { title: 'Android + iOS (ambas)', value: 'both' },
-        { title: 'Solo Android', value: 'android' },
-        { title: 'Solo iOS', value: 'ios' },
-      ],
-    },
-    { onCancel }
-  );
+  const isElectron = projectType === 'electron';
 
-  const { wantsSigning } = await prompts(
-    {
-      type: 'confirm',
-      name: 'wantsSigning',
-      message: '¿Ya tenés listos los secrets de firma (keystore / certificado de Apple)?',
-      initial: false,
-    },
-    { onCancel }
-  );
+  let buildAndroid = true;
+  let buildIos = true;
+  let buildElectron = true;
+  let wantsSigning = false;
+
+  if (isElectron) {
+    console.log('\nElectron compila Linux, macOS y Windows en paralelo — no hace falta elegir.\n');
+  } else {
+    const { target } = await prompts(
+      {
+        type: 'select',
+        name: 'target',
+        message: '¿Qué deseas compilar?',
+        choices: [
+          { title: 'Android + iOS (ambas)', value: 'both' },
+          { title: 'Solo Android', value: 'android' },
+          { title: 'Solo iOS', value: 'ios' },
+        ],
+      },
+      { onCancel }
+    );
+    buildAndroid = target !== 'ios';
+    buildIos = target !== 'android';
+
+    const signingAnswer = await prompts(
+      {
+        type: 'confirm',
+        name: 'wantsSigning',
+        message: '¿Ya tenés listos los secrets de firma (keystore / certificado de Apple)?',
+        initial: false,
+      },
+      { onCancel }
+    );
+    wantsSigning = signingAnswer.wantsSigning;
+  }
 
   const { wantsRelease } = await prompts(
     {
@@ -89,9 +104,6 @@ async function main() {
     },
     { onCancel }
   );
-
-  const buildAndroid = target !== 'ios';
-  const buildIos = target !== 'android';
 
   const workflowPath = path.join(cwd, '.github', 'workflows', 'build.yml');
   if (fs.existsSync(workflowPath)) {
@@ -110,14 +122,25 @@ async function main() {
     }
   }
 
-  const yaml = buildWorkflowYaml({ projectType, buildAndroid, buildIos, createRelease: wantsRelease });
+  const yaml = buildWorkflowYaml({
+    projectType,
+    buildAndroid,
+    buildIos,
+    buildElectron,
+    createRelease: wantsRelease,
+  });
 
   fs.mkdirSync(path.dirname(workflowPath), { recursive: true });
   fs.writeFileSync(workflowPath, yaml);
 
   console.log(`\n✔ Escribí ${path.relative(cwd, workflowPath)}\n`);
 
-  if (wantsSigning) {
+  if (isElectron) {
+    console.log(
+      'Los builds de Electron salen sin firmar por ahora (la firma de macOS/Windows\n' +
+        'todavía no está soportada por la plataforma).\n'
+    );
+  } else if (wantsSigning) {
     console.log('Agregá estos secrets en GitHub (Settings → Secrets and variables → Actions):\n');
     if (buildAndroid) console.log(`  Android: ${androidSecrets().join(', ')}`);
     if (buildIos) console.log(`  iOS:     ${iosSecrets().join(', ')}`);
@@ -130,7 +153,7 @@ async function main() {
   }
 
   console.log('Siguiente paso: hacé commit y push — el primer build corre solo, gratis,');
-  console.log('sin necesitar una Mac para la parte de iOS.\n');
+  console.log('sin necesitar Mac (ni Windows, si es Electron) en tu máquina.\n');
 }
 
 main();

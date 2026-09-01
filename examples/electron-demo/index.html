@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Electron Demo</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Electron Demo</h1>
+    <p>Compilada con la plataforma shadownrx/code.</p>
+    <p id="platform"></p>
+  </main>
+  <script>
+    document.getElementById('platform').textContent = `Plataforma: ${window.demo.platform}`;
+  </script>
+</body>
+</html>

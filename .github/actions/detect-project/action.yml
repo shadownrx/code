@@ -1,5 +1,5 @@
 name: "Detect mobile project type"
-description: "Detects whether a repository is a Flutter, React Native, or Capacitor (PWA) project"
+description: "Detects whether a repository is a Flutter, React Native, Capacitor (PWA), or Electron project"
 
 inputs:
   working-directory:
@@ -9,7 +9,7 @@ inputs:
 
 outputs:
   project_type:
-    description: "flutter | react-native | pwa | unknown"
+    description: "flutter | react-native | pwa | electron | unknown"
     value: ${{ steps.detect.outputs.project_type }}
 
 runs:
@@ -25,10 +25,13 @@ runs:
         elif [ -f "capacitor.config.ts" ] || [ -f "capacitor.config.json" ]; then
           echo "Detected: Capacitor (PWA) project"
           echo "project_type=pwa" >> "$GITHUB_OUTPUT"
+        elif [ -f "package.json" ] && grep -qE '"electron(-builder)?"' package.json; then
+          echo "Detected: Electron project"
+          echo "project_type=electron" >> "$GITHUB_OUTPUT"
         elif [ -f "package.json" ] && grep -q '"react-native"' package.json; then
           echo "Detected: React Native project"
           echo "project_type=react-native" >> "$GITHUB_OUTPUT"
         else
-          echo "::warning::Could not auto-detect project type (no pubspec.yaml with flutter:, no capacitor.config.ts/json, no package.json with react-native)"
+          echo "::warning::Could not auto-detect project type (no pubspec.yaml with flutter:, no capacitor.config.ts/json, no package.json with electron/react-native)"
           echo "project_type=unknown" >> "$GITHUB_OUTPUT"
         fi

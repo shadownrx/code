@@ -30,6 +30,24 @@ test('detects PWA via capacitor.config.json', () => {
   assert.equal(detectProjectType(dir), 'pwa');
 });
 
+test('detects Electron via package.json devDependency', () => {
+  const dir = tmpProject({
+    'package.json': JSON.stringify({ name: 'demo', devDependencies: { electron: '33.2.0', 'electron-builder': '25.1.8' } }),
+  });
+  assert.equal(detectProjectType(dir), 'electron');
+});
+
+test('Electron is detected before React Native when both happen to be present', () => {
+  const dir = tmpProject({
+    'package.json': JSON.stringify({
+      name: 'demo',
+      dependencies: { 'react-native': '0.87.1' },
+      devDependencies: { electron: '33.2.0' },
+    }),
+  });
+  assert.equal(detectProjectType(dir), 'electron');
+});
+
 test('returns null when nothing matches', () => {
   const dir = tmpProject({ 'README.md': '# nothing here' });
   assert.equal(detectProjectType(dir), null);
@@ -60,4 +78,12 @@ test('create_release adds the permissions block and input', () => {
   const yaml = buildWorkflowYaml({ projectType: 'pwa', buildAndroid: true, buildIos: true, createRelease: true });
   assert.match(yaml, /permissions:\n\s+contents: write/);
   assert.match(yaml, /create_release: true/);
+});
+
+test('electron project type emits build_electron instead of build_android/build_ios', () => {
+  const yaml = buildWorkflowYaml({ projectType: 'electron', buildElectron: true, createRelease: false });
+  assert.match(yaml, /project_type: electron/);
+  assert.match(yaml, /build_electron: true/);
+  assert.doesNotMatch(yaml, /build_android/);
+  assert.doesNotMatch(yaml, /build_ios/);
 });

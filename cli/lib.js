@@ -5,6 +5,7 @@ export const PROJECT_LABELS = {
   flutter: 'Flutter',
   'react-native': 'React Native',
   pwa: 'PWA (Capacitor)',
+  electron: 'Electron',
 };
 
 /**
@@ -30,6 +31,7 @@ export function detectProjectType(cwd) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      if (deps && (deps['electron'] || deps['electron-builder'])) return 'electron';
       if (deps && deps['react-native']) return 'react-native';
     } catch {
       // malformed package.json — fall through to "not detected"
@@ -51,8 +53,12 @@ export function iosSecrets() {
  * Builds the literal contents of .github/workflows/build.yml.
  * Kept as plain string templating (not a YAML library) so the output
  * matches exactly what docs/USAGE.md shows and stays easy to diff by eye.
+ *
+ * For projectType 'electron', buildAndroid/buildIos are irrelevant (that
+ * job only runs for mobile project types) and buildElectron is emitted
+ * instead — and vice versa.
  */
-export function buildWorkflowYaml({ projectType, buildAndroid, buildIos, createRelease }) {
+export function buildWorkflowYaml({ projectType, buildAndroid, buildIos, buildElectron, createRelease }) {
   const lines = [
     'name: Build Mobile Apps',
     '',
@@ -71,13 +77,13 @@ export function buildWorkflowYaml({ projectType, buildAndroid, buildIos, createR
     lines.push('    permissions:', '      contents: write');
   }
 
-  lines.push(
-    '    uses: shadownrx/code/.github/workflows/build-mobile.yml@main',
-    '    with:',
-    `      project_type: ${projectType}`,
-    `      build_android: ${buildAndroid}`,
-    `      build_ios: ${buildIos}`
-  );
+  lines.push('    uses: shadownrx/code/.github/workflows/build-mobile.yml@main', '    with:', `      project_type: ${projectType}`);
+
+  if (projectType === 'electron') {
+    lines.push(`      build_electron: ${buildElectron}`);
+  } else {
+    lines.push(`      build_android: ${buildAndroid}`, `      build_ios: ${buildIos}`);
+  }
 
   if (createRelease) {
     lines.push('      create_release: true');
