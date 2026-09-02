@@ -82,17 +82,21 @@ Landing/                       # sitio de docs/landing en Astro (vercel.com/docs
 
 ## Empezar
 
-**Opción rápida — asistente de terminal:** `npx shadownrx-code` parado en tu
-proyecto (Flutter, React Native, PWA o Electron) te hace un par de preguntas y
-te deja `.github/workflows/build.yml` ya escrito. Ver
-[`cli/README.md`](cli/README.md).
+**Opción rápida — asistente de terminal:** el paquete
+[`shadownrx-code`](https://www.npmjs.com/package/shadownrx-code) está
+publicado en npm. Ejecutando `npx shadownrx-code` en la raíz del proyecto
+(Flutter, React Native, PWA o Electron) se generan las preguntas de
+configuración necesarias y se escribe `.github/workflows/build.yml` listo
+para usar. Ver [`cli/README.md`](cli/README.md) para el detalle de
+instalación y uso.
 
-**Opción tool de editor — Cursor / cualquier cliente MCP:** lo mismo, pero
-como una tool que el agente llama directo en la conversación en vez de que
-corras un comando vos. Este repo ya trae `.cursor/mcp.json` configurado (corré
-`npm install` en `cli/` una vez) — ver la sección
+**Opción tool de editor — Cursor / cualquier cliente MCP:** la misma
+funcionalidad, expuesta como una tool que el agente invoca directamente
+durante la conversación, sin necesidad de ejecutar un comando manualmente.
+Este repositorio incluye `.cursor/mcp.json` preconfigurado (requiere
+ejecutar `npm install` en `cli/` una vez) — ver la sección
 ["Como tool de Cursor"](cli/README.md#como-tool-de-cursor-o-cualquier-cliente-mcp)
-en `cli/README.md`.
+de `cli/README.md`.
 
 **Manual:**
 

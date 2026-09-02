@@ -1,10 +1,14 @@
 # shadownrx-code
 
+[![npm version](https://img.shields.io/npm/v/shadownrx-code.svg)](https://www.npmjs.com/package/shadownrx-code)
+[![node](https://img.shields.io/node/v/shadownrx-code.svg)](https://www.npmjs.com/package/shadownrx-code)
+
 Configurador interactivo de terminal para la plataforma de build de
-`shadownrx/code`. Detecta si tu proyecto es Flutter, React Native, una PWA
-(Capacitor) o Electron, te hace un par de preguntas, y te escribe
-`.github/workflows/build.yml` ya configurado — no compila nada localmente, solo
-prepara el workflow que corre gratis en GitHub Actions.
+`shadownrx/code`. Detecta si el proyecto es Flutter, React Native, una PWA
+(Capacitor) o Electron, formula las preguntas de configuración necesarias, y
+genera `.github/workflows/build.yml` listo para usar. No compila nada de
+forma local: únicamente prepara el workflow que se ejecuta en GitHub
+Actions.
 
 ```
 ▲ shadownrx/code — configurador de CI para Android, iOS y Electron
@@ -17,58 +21,77 @@ prepara el workflow que corre gratis en GitHub Actions.
 ✔ Escribí .github/workflows/build.yml
 ```
 
-Para Electron, la pregunta "¿Qué deseas compilar?" y la de firma no aparecen
-(Electron siempre compila Linux + macOS + Windows, y la firma todavía no está
-soportada) — solo pregunta el tipo de proyecto y si querés adjuntar a un
-GitHub Release.
+Para proyectos Electron las preguntas de plataforma de compilación y de
+firma no se muestran: Electron siempre compila para Linux, macOS y Windows,
+y la firma de sus artefactos aún no está soportada por la plataforma. En ese
+caso solo se pregunta el tipo de proyecto y si se desea adjuntar los
+artefactos a un GitHub Release.
 
-## Usar
+## Instalación
 
-Publicado en npm como
-[`shadownrx-code`](https://www.npmjs.com/package/shadownrx-code) (v2.0.0).
-Alcanza con:
+El paquete está publicado en npm como
+[`shadownrx-code`](https://www.npmjs.com/package/shadownrx-code).
+
+**Sin instalación** (recomendado): `npx` descarga la última versión
+publicada, la ejecuta una única vez, y no deja nada instalado de forma
+permanente.
 
 ```bash
 npx shadownrx-code
 ```
 
-parado en la raíz de tu proyecto (Flutter, React Native, PWA o Electron) — sin
-clonar nada ni instalar nada de forma permanente: `npx` baja la última
-versión publicada, la corre, y listo.
-
-También podés instalarlo global si preferís no repetir la descarga cada vez:
+**Instalación global**, si se prefiere evitar la descarga en cada
+ejecución:
 
 ```bash
 npm install -g shadownrx-code
 shadownrx-code
 ```
 
-O correr la versión local del repo clonado:
+**Desde el código fuente del repositorio**, sin depender del registro de
+npm:
 
 ```bash
 git clone https://github.com/shadownrx/code
 cd code/cli
 npm install
-node bin.js   # parado en la raíz de TU proyecto, o pasale el cwd que corresponda
+node bin.js
 ```
 
-o, apuntando directo a la carpeta de tu proyecto:
+También puede apuntarse directamente a un proyecto en otra ruta:
 
 ```bash
 cd /ruta/a/tu/proyecto
 node /ruta/a/code/cli/bin.js
 ```
 
+En todos los casos, el comando debe ejecutarse parado en la raíz del
+proyecto a configurar (Flutter, React Native, PWA o Electron).
+
 ## Como tool de Cursor (o cualquier cliente MCP)
 
-Además del CLI interactivo, `mcp-server.js` expone lo mismo como un servidor
-[MCP](https://modelcontextprotocol.io) — así el agente de Cursor (o Claude
-Code, Windsurf, o cualquier editor con soporte MCP; no es algo específico de
-Cursor) puede llamarlo directamente en la conversación, sin que abras una
-terminal vos.
+Además del CLI interactivo, `mcp-server.js` expone la misma funcionalidad
+como un servidor [MCP](https://modelcontextprotocol.io), de modo que el
+agente de Cursor (o Claude Code, Windsurf, o cualquier editor con soporte
+MCP — no es específico de Cursor) puede invocarla directamente durante la
+conversación, sin necesidad de abrir una terminal.
 
-Agregá esto a `.cursor/mcp.json` en tu proyecto (o al `mcp.json` global de
-Cursor):
+Configuración en `.cursor/mcp.json` del proyecto (o en el `mcp.json`
+global de Cursor):
+
+```json
+{
+  "mcpServers": {
+    "shadownrx-code": {
+      "command": "npx",
+      "args": ["-y", "shadownrx-code-mcp"]
+    }
+  }
+}
+```
+
+Alternativamente, apuntando a una copia local del repositorio en lugar del
+paquete publicado:
 
 ```json
 {
@@ -81,55 +104,57 @@ Cursor):
 }
 ```
 
-También podés usar `"command": "npx", "args": ["-y", "shadownrx-code-mcp"]`
-en vez de la ruta absoluta, sin necesidad de clonar el repo.
-
-Este mismo repo ya trae [`.cursor/mcp.json`](../.cursor/mcp.json) apuntando a
-`cli/mcp-server.js` con `${workspaceFolder}` — si abrís `shadownrx/code` en
-Cursor, la tool queda disponible sola. Eso sí, corré `npm install` en `cli/`
-primero (`node_modules` no se commitea): el server necesita
-`@modelcontextprotocol/sdk` y `zod` instalados para arrancar.
+Este repositorio incluye [`.cursor/mcp.json`](../.cursor/mcp.json)
+configurado con la segunda variante y `${workspaceFolder}` — al abrir
+`shadownrx/code` en Cursor, la tool queda disponible automáticamente. Es
+necesario ejecutar `npm install` en `cli/` una vez (`node_modules` no se
+versiona): el servidor requiere `@modelcontextprotocol/sdk` y `zod`
+instalados para iniciar.
 
 Expone dos tools:
 
 | Tool | Qué hace |
 |---|---|
-| `detect_project_type` | Solo lee: reporta si un directorio es Flutter/React Native/PWA/Electron. No escribe nada. |
-| `setup_mobile_ci` | Detecta (o recibe `project_type` explícito) y escribe `.github/workflows/build.yml` — mismos parámetros que el CLI interactivo (`build_android`, `build_ios`, `build_electron`, `create_release`), más `overwrite` para confirmar si el archivo ya existe. |
+| `detect_project_type` | Solo lectura: reporta si un directorio es Flutter, React Native, PWA o Electron. No escribe nada. |
+| `setup_mobile_ci` | Detecta el tipo de proyecto (o recibe `project_type` explícito) y escribe `.github/workflows/build.yml` — mismos parámetros que el CLI interactivo (`build_android`, `build_ios`, `build_electron`, `create_release`), más `overwrite` para confirmar la sobrescritura si el archivo ya existe. |
 
-Ambas tools están probadas de punta a punta contra el server real (no un
-mock): `mcp-server.test.js` levanta `mcp-server.js` como subproceso vía stdio
-con el `Client` del SDK de MCP y llama las tools de verdad.
+Ambas tools están cubiertas por tests de punta a punta contra el servidor
+real (no un mock): `mcp-server.test.js` levanta `mcp-server.js` como
+subproceso vía stdio, usando el `Client` del SDK de MCP para invocar las
+tools reales.
 
 ## Qué pregunta y por qué
 
-Cada pregunta mapea 1 a 1 a un input real de
-[`build-mobile.yml`](../.github/workflows/build-mobile.yml) — no hay ninguna
-opción que prometa algo que la plataforma no haga. Ver
-[`docs/USAGE.md`](../docs/USAGE.md) para el detalle de cada input.
+Cada pregunta mapea uno a uno con un input real de
+[`build-mobile.yml`](../.github/workflows/build-mobile.yml): no hay ninguna
+opción que prometa una funcionalidad que la plataforma no implemente. El
+detalle de cada input está documentado en
+[`docs/USAGE.md`](../docs/USAGE.md).
 
 | Pregunta | Input generado |
 |---|---|
 | Tipo de proyecto (auto-detectado o elegido) | `project_type` |
 | Qué compilar (Android / iOS / ambas) — no aplica a Electron | `build_android`, `build_ios` |
-| ¿Adjuntar a un GitHub Release en tags? | `create_release` (+ el bloque `permissions: contents: write` que necesita) |
+| ¿Adjuntar a un GitHub Release en tags? | `create_release` (incluye el bloque `permissions: contents: write` requerido) |
 
-Para Electron, en vez de `build_android`/`build_ios` se emite
-`build_electron: true` (siempre compila los tres sistemas operativos).
+Para proyectos Electron, en lugar de `build_android`/`build_ios` se emite
+`build_electron: true` (siempre compila para los tres sistemas operativos).
 
-Si respondés que ya tenés los secrets de firma listos, te lista los nombres
-exactos que hay que cargar en GitHub y te manda a `docs/SIGNING.md` — no los
-pide ni los toca, esos siempre se configuran a mano como secrets de GitHub.
+Si se indica que los secrets de firma ya están configurados, se listan los
+nombres exactos que deben cargarse en GitHub y se referencia
+`docs/SIGNING.md`. El CLI no solicita ni manipula esos secrets: siempre se
+configuran manualmente como GitHub Secrets.
 
-Si `.github/workflows/build.yml` ya existe, pregunta antes de pisarlo.
+Si `.github/workflows/build.yml` ya existe, se solicita confirmación antes
+de sobrescribirlo.
 
 ## Desarrollo
 
-`lib.js` tiene toda la lógica pura (detección de proyecto + generación del
-YAML) separada de `bin.js` (la parte interactiva con
-[`prompts`](https://www.npmjs.com/package/prompts)) y de `mcp-server.js` (el
-server MCP) — justamente para no duplicar la lógica y poder testearla sin
-simular una terminal ni un cliente MCP real:
+La lógica pura (detección de proyecto y generación del YAML) vive en
+`lib.js`, separada de `bin.js` (la interfaz interactiva, con
+[`prompts`](https://www.npmjs.com/package/prompts)) y de `mcp-server.js`
+(el servidor MCP). Esta separación evita duplicar lógica y permite testear
+sin simular una terminal ni un cliente MCP real:
 
 ```bash
 npm test   # node --test — corre lib.test.js y mcp-server.test.js
