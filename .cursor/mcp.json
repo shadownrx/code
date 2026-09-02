@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "shadownrx-code": {
+      "command": "node",
+      "args": ["${workspaceFolder}/cli/mcp-server.js"]
+    }
+  }
+}

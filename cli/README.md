@@ -52,6 +52,49 @@ cd /ruta/a/tu/proyecto
 node /ruta/a/code/cli/bin.js
 ```
 
+## Como tool de Cursor (o cualquier cliente MCP)
+
+Además del CLI interactivo, `mcp-server.js` expone lo mismo como un servidor
+[MCP](https://modelcontextprotocol.io) — así el agente de Cursor (o Claude
+Code, Windsurf, o cualquier editor con soporte MCP; no es algo específico de
+Cursor) puede llamarlo directamente en la conversación, sin que abras una
+terminal vos.
+
+Agregá esto a `.cursor/mcp.json` en tu proyecto (o al `mcp.json` global de
+Cursor):
+
+```json
+{
+  "mcpServers": {
+    "shadownrx-code": {
+      "command": "node",
+      "args": ["/ruta/absoluta/a/code/cli/mcp-server.js"]
+    }
+  }
+}
+```
+
+(Una vez publicado en npm, `"command": "npx", "args": ["-y", "shadownrx-code-mcp"]`
+alcanzaría, sin ruta absoluta ni clonar nada — mismo estado pendiente que el
+CLI, ver arriba.)
+
+Este mismo repo ya trae [`.cursor/mcp.json`](../.cursor/mcp.json) apuntando a
+`cli/mcp-server.js` con `${workspaceFolder}` — si abrís `shadownrx/code` en
+Cursor, la tool queda disponible sola. Eso sí, corré `npm install` en `cli/`
+primero (`node_modules` no se commitea): el server necesita
+`@modelcontextprotocol/sdk` y `zod` instalados para arrancar.
+
+Expone dos tools:
+
+| Tool | Qué hace |
+|---|---|
+| `detect_project_type` | Solo lee: reporta si un directorio es Flutter/React Native/PWA/Electron. No escribe nada. |
+| `setup_mobile_ci` | Detecta (o recibe `project_type` explícito) y escribe `.github/workflows/build.yml` — mismos parámetros que el CLI interactivo (`build_android`, `build_ios`, `build_electron`, `create_release`), más `overwrite` para confirmar si el archivo ya existe. |
+
+Ambas tools están probadas de punta a punta contra el server real (no un
+mock): `mcp-server.test.js` levanta `mcp-server.js` como subproceso vía stdio
+con el `Client` del SDK de MCP y llama las tools de verdad.
+
 ## Qué pregunta y por qué
 
 Cada pregunta mapea 1 a 1 a un input real de
@@ -78,9 +121,10 @@ Si `.github/workflows/build.yml` ya existe, pregunta antes de pisarlo.
 
 `lib.js` tiene toda la lógica pura (detección de proyecto + generación del
 YAML) separada de `bin.js` (la parte interactiva con
-[`prompts`](https://www.npmjs.com/package/prompts)), justamente para poder
-testearla sin simular una terminal:
+[`prompts`](https://www.npmjs.com/package/prompts)) y de `mcp-server.js` (el
+server MCP) — justamente para no duplicar la lógica y poder testearla sin
+simular una terminal ni un cliente MCP real:
 
 ```bash
-npm test   # node --test — corre lib.test.js
+npm test   # node --test — corre lib.test.js y mcp-server.test.js
 ```

@@ -74,6 +74,9 @@ examples/
   electron-demo/              # app Electron mínima usada para probar la plataforma
 cli/
   bin.js                      # configurador interactivo de terminal — ver cli/README.md
+  mcp-server.js                # lo mismo, como tool MCP para Cursor/Claude Code/etc.
+.cursor/
+  mcp.json                     # este repo ya trae la tool de Cursor precargada
 Landing/                       # sitio de docs/landing en Astro (vercel.com/docs-like)
 ```
 
@@ -81,8 +84,16 @@ Landing/                       # sitio de docs/landing en Astro (vercel.com/docs
 
 **Opción rápida — asistente de terminal:** `npx shadownrx-code` (una vez
 publicado; por ahora, `node cli/bin.js` desde el repo clonado) parado en tu
-proyecto (Flutter, React Native o PWA) te hace un par de preguntas y te deja
-`.github/workflows/build.yml` ya escrito. Ver [`cli/README.md`](cli/README.md).
+proyecto (Flutter, React Native, PWA o Electron) te hace un par de preguntas y
+te deja `.github/workflows/build.yml` ya escrito. Ver
+[`cli/README.md`](cli/README.md).
+
+**Opción tool de editor — Cursor / cualquier cliente MCP:** lo mismo, pero
+como una tool que el agente llama directo en la conversación en vez de que
+corras un comando vos. Este repo ya trae `.cursor/mcp.json` configurado (corré
+`npm install` en `cli/` una vez) — ver la sección
+["Como tool de Cursor"](cli/README.md#como-tool-de-cursor-o-cualquier-cliente-mcp)
+en `cli/README.md`.
 
 **Manual:**
 
