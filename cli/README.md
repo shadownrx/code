@@ -24,19 +24,26 @@ GitHub Release.
 
 ## Usar
 
-La idea es que, una vez publicado, alcance con:
+Publicado en npm como
+[`shadownrx-code`](https://www.npmjs.com/package/shadownrx-code) (v2.0.0).
+Alcanza con:
 
 ```bash
 npx shadownrx-code
 ```
 
 parado en la raíz de tu proyecto (Flutter, React Native, PWA o Electron) — sin
-clonar nada. **Todavía no está publicado en npm** (publicarlo es distribuirlo
-públicamente, así que quedó pendiente de que lo pidas explícito — y hace falta
-una cuenta/token de npm que este entorno no tiene). El nombre `shadownrx-code`
-está libre en el registro — no se reserva hasta el primer `npm publish`.
+clonar nada ni instalar nada de forma permanente: `npx` baja la última
+versión publicada, la corre, y listo.
 
-Mientras tanto, corré la versión local:
+También podés instalarlo global si preferís no repetir la descarga cada vez:
+
+```bash
+npm install -g shadownrx-code
+shadownrx-code
+```
+
+O correr la versión local del repo clonado:
 
 ```bash
 git clone https://github.com/shadownrx/code
@@ -74,9 +81,8 @@ Cursor):
 }
 ```
 
-(Una vez publicado en npm, `"command": "npx", "args": ["-y", "shadownrx-code-mcp"]`
-alcanzaría, sin ruta absoluta ni clonar nada — mismo estado pendiente que el
-CLI, ver arriba.)
+También podés usar `"command": "npx", "args": ["-y", "shadownrx-code-mcp"]`
+en vez de la ruta absoluta, sin necesidad de clonar el repo.
 
 Este mismo repo ya trae [`.cursor/mcp.json`](../.cursor/mcp.json) apuntando a
 `cli/mcp-server.js` con `${workspaceFolder}` — si abrís `shadownrx/code` en

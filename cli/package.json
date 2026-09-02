@@ -1,6 +1,6 @@
 {
   "name": "shadownrx-code",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Interactive CLI + MCP server for the shadownrx/code free Android/iOS/PWA/Electron build platform — writes .github/workflows/build.yml for your project, or exposes the same thing as tools for Cursor/Claude Code/any MCP client.",
   "type": "module",
   "bin": {
