@@ -9,18 +9,20 @@ const toc = [
   { depth: 2, slug: 'costo', text: 'Por qué es gratis' },
 ];
 ---
-<Layout title="Introducción" description="Compilá Android e iOS desde Flutter, React Native o una PWA — gratis, sin necesitar una Mac.">
+<Layout title="Introducción" description="Compilá Android, iOS y apps de escritorio Electron desde Flutter, React Native, PWA o Electron — gratis, sin necesitar una Mac ni una PC con Windows.">
   <div class="hero">
     <p class="eyebrow">Workflow reutilizable · GitHub Actions</p>
     <h1>No hace falta una Mac.</h1>
     <p class="lead">
-      Un workflow reutilizable que compila tu app Flutter, React Native o PWA
-      para Android <strong>e</strong> iOS con cada push. El build de iOS corre en
-      un runner macOS gratuito de GitHub, en la nube — gratis, sin backend
+      Un workflow reutilizable que compila tu app Flutter, React Native, PWA o
+      Electron para Android, iOS <strong>y</strong> escritorio (Linux/macOS/
+      Windows) con cada push. Los builds de iOS y Electron para macOS/Windows
+      corren en runners gratuitos de GitHub, en la nube — gratis, sin backend
       propio, sin límite de equipos.
     </p>
     <div class="cta-row">
       <a class="btn-primary" href="#como-funciona">Ver el quickstart</a>
+      <a class="btn-quiet" href="/docs/cli">npx shadownrx-code →</a>
       <a class="btn-quiet" href="/docs/usage">Documentación completa →</a>
     </div>
   </div>
@@ -37,7 +39,7 @@ const toc = [
   <span class="k">build</span>:
     <span class="k">uses</span>: <span class="s">shadownrx/code/.github/workflows/build-mobile.yml@main</span>
     <span class="k">with</span>:
-      <span class="k">project_type</span>: <span class="s">auto</span>   <span class="c"># auto | flutter | react-native | pwa</span>
+      <span class="k">project_type</span>: <span class="s">auto</span>   <span class="c"># auto | flutter | react-native | pwa | electron</span>
     <span class="k">secrets</span>: <span class="s">inherit</span></code></pre>
 
   <div class="steps">
@@ -54,7 +56,7 @@ const toc = [
     <div class="step">
       <span class="num">03</span>
       <h3>Descargás el resultado</h3>
-      <p>APK/AAB e IPA (o <code>.app</code> sin firmar) como artifacts.</p>
+      <p>APK/AAB, IPA (o <code>.app</code>), y AppImage/DMG/EXE como artifacts.</p>
     </div>
   </div>
 
@@ -76,6 +78,12 @@ const toc = [
       <span class="badge">PWA · v1.2</span>
       <p class="detect"><code>capacitor.config.ts</code> / <code>.json</code></p>
       <p class="out">Empaqueta tu PWA con Capacitor — SPM en iOS, sin CocoaPods.</p>
+      <span class="pill-ok">Validado en CI</span>
+    </div>
+    <div class="fw-card">
+      <span class="badge">Electron</span>
+      <p class="detect"><code>package.json</code> → dependencia <strong>electron</strong></p>
+      <p class="out">Genera <code>.AppImage</code>, <code>.dmg</code> y <code>.exe</code> en Linux + macOS + Windows.</p>
       <span class="pill-ok">Validado en CI</span>
     </div>
   </div>
@@ -106,6 +114,7 @@ const toc = [
     <li><strong>Repos privados:</strong> cuota mensual gratis (macOS consume minutos a mayor tasa que Linux).</li>
     <li><strong>Multi-equipo real:</strong> cada repo paga con sus propios minutos — nada que esta plataforma sostenga.</li>
     <li><strong>Firma de iOS:</strong> requiere cuenta de Apple Developer (costo de Apple, no de la plataforma).</li>
+    <li><strong>Electron:</strong> compila en Linux + macOS + Windows en paralelo — consume minutos de las tres plataformas por build; su firma todavía no está soportada.</li>
   </ul>
 
   <TableOfContents slot="toc" headings={toc} />
@@ -153,7 +162,7 @@ const toc = [
   .step h3 { font-size: 0.95rem; margin: 6px 0 4px; }
   .step p { font-size: 0.86rem; color: var(--text-secondary); margin: 0; }
 
-  .fw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .fw-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
   @media (max-width: 720px) { .fw-grid { grid-template-columns: 1fr; } }
   .fw-card {
     border: 1px solid var(--border);

@@ -2,7 +2,7 @@
 title: Firma de apps
 description: Configurar firma de release para Android e iOS, y notificaciones.
 section: Guías
-order: 2
+order: 3
 ---
 
 Sin firma, los builds sirven para verificar que compilan y para correr en

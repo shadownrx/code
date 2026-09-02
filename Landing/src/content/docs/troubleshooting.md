@@ -2,7 +2,7 @@
 title: Errores y soluciones
 description: Errores reales encontrados armando esta plataforma, con causa y fix.
 section: Guías
-order: 3
+order: 4
 ---
 
 Esta lista incluye errores **reales** que aparecieron mientras se armaba y probaba
@@ -96,8 +96,9 @@ aplica — el scheme es siempre `App` (nombre fijo del template).
 ## El proyecto no se detecta (`project_type: unknown`)
 
 **Causa:** con `project_type: auto`, la plataforma busca `pubspec.yaml` con
-`flutter:`, un `capacitor.config.ts`/`.json`, o `package.json` con
-`"react-native"` **en la raíz de `working_directory`**.
+`flutter:`, un `capacitor.config.ts`/`.json`, `package.json` con
+`"react-native"`, o `package.json` con `"electron"`/`"electron-builder"` —
+**en la raíz de `working_directory`**.
 
 **Solución:** ajustá `working_directory`, o fijá `project_type` explícitamente.
 

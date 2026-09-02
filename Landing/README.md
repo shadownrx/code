@@ -25,7 +25,7 @@ npm run preview   # sirve el build de producción
 src/
   components/   TopNav (con buscador), Sidebar, TableOfContents, ThemeToggle
   layouts/      Layout.astro — shell de 3 columnas (sidebar | contenido | TOC)
-  content/docs/ Los tres docs reales (usage, signing, troubleshooting) como Markdown
+  content/docs/ Los cuatro docs reales (usage, cli, signing, troubleshooting) como Markdown
   pages/
     index.astro           landing/introducción, dentro del mismo shell de docs
     docs/[...slug].astro  ruta dinámica que renderiza cada entrada de content/docs
