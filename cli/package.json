@@ -4,8 +4,8 @@
   "description": "Interactive CLI + MCP server for the shadownrx/code free Android/iOS/PWA/Electron build platform — writes .github/workflows/build.yml for your project, or exposes the same thing as tools for Cursor/Claude Code/any MCP client.",
   "type": "module",
   "bin": {
-    "shadownrx-code": "./bin.js",
-    "shadownrx-code-mcp": "./mcp-server.js"
+    "shadownrx-code": "bin.js",
+    "shadownrx-code-mcp": "mcp-server.js"
   },
   "files": [
     "bin.js",
