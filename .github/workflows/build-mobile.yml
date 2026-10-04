@@ -341,8 +341,14 @@ jobs:
               fail=1
               continue
             fi
-            got=$(echo "$out" | awk -F': ' '/Signer #1 certificate SHA-256 digest/{print $2; exit}')
-            if [ "$got" != "$EXPECTED" ]; then
+            # Every signer line, whatever its label ("Signer #1", or
+            # "Signer (minSdkVersion=…)" with v3.1/rotation).
+            got=$(echo "$out" | grep -i 'certificate SHA-256 digest:' | sed 's/.*digest: *//' | tr -d ' \t\r' | tr 'A-F' 'a-f' | sort -u | paste -sd, -)
+            if [ -z "$got" ]; then
+              echo "::error::$f: no pude leer el certificado de la salida de apksigner ($("$BT/apksigner" --version 2>&1), $BT)."
+              echo "$out"
+              fail=1
+            elif [[ ",$got," != *",$EXPECTED,"* ]]; then
               echo "::error::$f está firmado con otro certificado ($got, esperado $EXPECTED): $HINT"
               fail=1
             else
