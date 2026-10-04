@@ -10,9 +10,11 @@ import { z } from 'zod';
 import {
   PROJECT_LABELS,
   androidSecrets,
+  appStoreSecrets,
   buildWorkflowYaml,
   detectProjectType,
   iosSecrets,
+  playStoreSecrets,
 } from './lib.js';
 
 const server = new McpServer({ name: 'shadownrx-code', version: '1.0.0' });
@@ -67,10 +69,28 @@ server.registerTool(
       build_ios: z.boolean().optional().describe('Only relevant for flutter/react-native/pwa. Default true.'),
       build_electron: z.boolean().optional().describe('Only relevant for project_type electron. Default true.'),
       create_release: z.boolean().optional().describe('Attach build artifacts to a GitHub Release on tag pushes. Default false.'),
+      publish_play_store: z
+        .boolean()
+        .optional()
+        .describe('Upload the signed .aab to the Google Play internal track on v* tag pushes. Needs Android signing + GOOGLE_PLAY_SERVICE_ACCOUNT_JSON. Default false.'),
+      publish_testflight: z
+        .boolean()
+        .optional()
+        .describe('Upload the signed .ipa to TestFlight on v* tag pushes. Needs an App Store provisioning profile + APP_STORE_CONNECT_* secrets. Default false.'),
       overwrite: z.boolean().optional().describe('Overwrite an existing .github/workflows/build.yml. Default false.'),
     },
   },
-  async ({ cwd, project_type, build_android, build_ios, build_electron, create_release, overwrite }) => {
+  async ({
+    cwd,
+    project_type,
+    build_android,
+    build_ios,
+    build_electron,
+    create_release,
+    publish_play_store,
+    publish_testflight,
+    overwrite,
+  }) => {
     const dir = cwd ? path.resolve(cwd) : process.cwd();
     if (!fs.existsSync(dir)) {
       return { ...text(`No existe el directorio: ${dir}`), isError: true };
@@ -92,12 +112,18 @@ server.registerTool(
     }
 
     const isElectron = projectType === 'electron';
+    const buildAndroid = build_android ?? true;
+    const buildIos = build_ios ?? true;
+    const publishPlayStore = !isElectron && buildAndroid && (publish_play_store ?? false);
+    const publishTestflight = !isElectron && buildIos && (publish_testflight ?? false);
     const yaml = buildWorkflowYaml({
       projectType,
-      buildAndroid: build_android ?? true,
-      buildIos: build_ios ?? true,
+      buildAndroid,
+      buildIos,
       buildElectron: build_electron ?? true,
       createRelease: create_release ?? false,
+      publishPlayStore,
+      publishTestflight,
     });
 
     const workflowPath = path.join(dir, '.github', 'workflows', 'build.yml');
@@ -123,6 +149,16 @@ server.registerTool(
         'Sin firma por defecto. Para builds firmados agregá los secrets de GitHub descritos en docs/SIGNING.md:\n' +
           `  Android: ${androidSecrets().join(', ')}\n` +
           `  iOS:     ${iosSecrets().join(', ')}`
+      );
+    }
+    if (publishPlayStore || publishTestflight) {
+      const stores = [];
+      if (publishPlayStore) stores.push(`  Google Play: ${playStoreSecrets().join(', ')}`);
+      if (publishTestflight) stores.push(`  TestFlight:  ${appStoreSecrets().join(', ')}`);
+      notes.push(
+        'Publicación en tiendas activa solo en tags v* (git tag v1.0.0 && git push --tags). ' +
+          'Exige firma real + estos secrets (ver docs/PUBLISHING.md):\n' +
+          stores.join('\n')
       );
     }
     notes.push('Siguiente paso: commit + push. El build corre gratis en GitHub Actions.');

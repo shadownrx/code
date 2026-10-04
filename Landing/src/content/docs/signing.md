@@ -68,6 +68,21 @@ Sin estos secrets, Android simplemente se genera sin firma de release (firma
 debug en Flutter/RN; sin firma en absoluto en la plantilla de Capacitor, que no
 define un `signingConfig` de debug explícito).
 
+### Verificación automática
+
+Con los secrets cargados, el workflow comprueba la firma real de lo que generó:
+
+1. Antes de compilar abre el keystore con la contraseña y el alias. Si alguno
+   está mal, falla ahí con un mensaje claro.
+2. Después del build revisa cada `.apk` (`apksigner`) y `.aab` (`jarsigner`) y
+   compara el certificado con el SHA-256 de tu keystore. Si algo sale sin firmar
+   o con la clave debug (el caso típico: un `build.gradle` que no lee
+   `key.properties`), el build falla en vez de salir verde.
+
+`signing_self_test: true` firma con un keystore descartable cuando no hay
+`ANDROID_KEYSTORE_BASE64`, para probar todo el camino sin tu clave real. Esos
+builds nunca se publican.
+
 ## iOS
 
 La firma de iOS **requiere una cuenta de Apple Developer** (de pago, ~99 USD/año)
@@ -82,11 +97,21 @@ Con cuenta de Apple Developer:
    [developer.apple.com](https://developer.apple.com).
 3. Codificá ambos en base64.
 4. Agregá los secrets: `IOS_CERTIFICATE_BASE64`, `IOS_CERTIFICATE_PASSWORD`,
-   `IOS_PROVISION_PROFILE_BASE64`, `IOS_TEAM_ID`.
+   `IOS_PROVISION_PROFILE_BASE64` y, opcional, `IOS_TEAM_ID` (se lee del perfil;
+   si lo cargás, se usa para confirmar que el perfil es de esa cuenta).
+5. Elegí `ios_export_method` según el tipo de perfil: `ad-hoc` (default),
+   `app-store`, `development` o `enterprise`.
 
 El workflow importa el certificado y el perfil en un keychain temporal del
-runner macOS, genera un `ExportOptions.plist` (método `ad-hoc` por defecto) y
-produce un `.ipa` firmado.
+runner macOS y, **antes de compilar**, valida que encajen: contraseña del
+`.p12`, perfil no vencido, certificado incluido en el perfil, tipo de perfil
+igual a `ios_export_method` y team correcto. Cada problema corta el build con su
+propio mensaje. Después configura firma manual solo en el target de la app (no
+en Pods/SPM), exporta el `.ipa` y lo **verifica** con `codesign`, confirmando
+team y perfil embebido.
+
+> Se firma un solo target de app con un solo perfil: las extensiones (widgets,
+> notification service) todavía no están soportadas.
 
 > Un proyecto **Capacitor** nuevo no tiene `Podfile` ni `.xcworkspace` (usa Swift
 > Package Manager desde Capacitor 7), así que la plataforma compila directo

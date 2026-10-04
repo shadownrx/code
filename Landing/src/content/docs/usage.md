@@ -60,7 +60,11 @@ muestra el estado de cada plataforma.
 ## Firma de apps
 
 Por defecto los builds son sin firmar. Para producir builds firmados, configurá
-los secrets descritos en [Firma de apps](/docs/signing). La firma de Electron
+los secrets descritos en [Firma de apps](/docs/signing); con la firma
+configurada, el workflow verifica que cada artefacto haya salido firmado con tus
+claves y falla si no. Con la firma lista, también puede subir los builds a
+Google Play y TestFlight en cada tag: ver [Publicar en tiendas](/docs/publishing).
+La firma de Electron
 todavía no está soportada por la plataforma; sus builds siempre salen sin
 firmar.
 
@@ -96,6 +100,15 @@ jobs:
 | `flutter_channel` | `stable` | Canal de Flutter. |
 | `node_version` | `22` | Versión de Node para React Native, PWA y Electron. |
 | `create_release` | `false` | Adjuntar artifacts a un GitHub Release en tags. |
+| `build_number` | (vacío) | `versionCode` / `CFBundleVersion`. Las tiendas rechazan uno repetido: pasá `${{ github.run_number }}`. |
+| `verify_signing` | `true` | Con secrets de firma, comprueba que cada `.apk`/`.aab`/`.ipa` esté firmado con ellos. |
+| `signing_self_test` | `false` | Sin keystore de Android, firma con uno descartable para probar el camino de firma. Nunca publicable. |
+| `ios_export_method` | `ad-hoc` | `ad-hoc`, `app-store`, `development` o `enterprise`; debe coincidir con el perfil. |
+| `publish_play_store` | `false` | Subir el `.aab` firmado a Google Play. |
+| `play_track` | `internal` | Track de Google Play. |
+| `play_release_status` | `completed` | `completed`, `draft` o `inProgress`. |
+| `android_package_name` | (vacío) | `applicationId`; vacío lo lee del APK. |
+| `publish_testflight` | `false` | Subir el `.ipa` firmado a TestFlight. |
 
 ## Ejemplo real: React Native
 

@@ -72,6 +72,13 @@ correspondiente → sección **Artifacts**: ahí están `android-build` (APK/AAB
 Por defecto los builds son **sin firmar** (sirven para probar que compila, correr en
 simulador/emulador, o distribución interna simple). Para producir builds firmados
 listos para tiendas, configurá los secrets descritos en [`SIGNING.md`](./SIGNING.md).
+Con la firma configurada, el workflow **verifica** que cada artefacto haya salido
+firmado con tus claves y falla si no.
+
+## 3b. Publicar en las tiendas (opcional)
+
+Con la firma lista, el workflow puede subir el `.aab` a **Google Play** y el `.ipa`
+a **TestFlight** cuando pusheás un tag `v*`. Ver [`PUBLISHING.md`](./PUBLISHING.md).
 
 ## 4. Notificaciones (opcional)
 
@@ -107,6 +114,15 @@ listos para tiendas, configurá los secrets descritos en [`SIGNING.md`](./SIGNIN
 | `flutter_channel` | `stable` | Versión/canal de Flutter. |
 | `node_version` | `22` | Versión de Node para React Native, PWA y Electron. Revisá el campo `engines.node` de tu `package.json`: React Native 0.81+ requiere Node ≥ 22.11. |
 | `create_release` | `false` | Adjuntar artefactos a un GitHub Release cuando corre sobre un tag. |
+| `build_number` | (vacío) | Número de build (`versionCode` / `CFBundleVersion`). Las tiendas rechazan uno repetido: pasá `${{ github.run_number }}`. Ver [`PUBLISHING.md`](./PUBLISHING.md). |
+| `verify_signing` | `true` | Con secrets de firma, comprueba que cada `.apk`/`.aab`/`.ipa` esté firmado con ellos y falla si no. Ver [`SIGNING.md`](./SIGNING.md). |
+| `signing_self_test` | `false` | Sin keystore de Android, firma con uno descartable para probar todo el camino de firma. Nunca publicable. |
+| `ios_export_method` | `ad-hoc` | `ad-hoc`, `app-store`, `development` o `enterprise`; tiene que coincidir con el tipo de perfil. |
+| `publish_play_store` | `false` | Subir el `.aab` firmado a Google Play. Ver [`PUBLISHING.md`](./PUBLISHING.md). |
+| `play_track` | `internal` | Track de Google Play. |
+| `play_release_status` | `completed` | `completed`, `draft` o `inProgress`. |
+| `android_package_name` | (vacío) | `applicationId`; vacío lo lee del APK. |
+| `publish_testflight` | `false` | Subir el `.ipa` firmado a TestFlight. Ver [`PUBLISHING.md`](./PUBLISHING.md). |
 
 ## Por qué es gratis y multi-equipo
 

@@ -27,6 +27,7 @@ npx shadownrx-code
 ? Detecté un proyecto React Native en este directorio. ¿Es correcto? › Yes
 ? ¿Qué deseas compilar? › Android + iOS (ambas)
 ? ¿Ya tenés listos los secrets de firma (keystore / certificado de Apple)? › No
+? ¿Publicar automáticamente al pushear un tag (v1.2.3)? › Google Play, TestFlight
 ? ¿Adjuntar los builds a un GitHub Release cuando pushees un tag (v1.2.3)? › No
 
 ✔ Escribí .github/workflows/build.yml
@@ -42,6 +43,11 @@ ya existe, se solicita confirmación antes de sobrescribirlo, y si se indica
 que los secrets de firma ya están configurados, se listan los nombres exactos
 que deben cargarse en GitHub (ver [Firma de apps](/docs/signing)) sin
 solicitarlos ni manipularlos.
+
+Sin preguntas: `npx shadownrx-code -y` usa lo detectado y los valores por
+defecto. `--play-store` y `--testflight` activan la subida a las tiendas en tags
+`v*` (ver [Publicar en tiendas](/docs/publishing)); `--release` adjunta los
+builds a un GitHub Release; `--dry-run` solo muestra el YAML.
 
 ## Instalación global
 

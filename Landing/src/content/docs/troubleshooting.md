@@ -2,7 +2,7 @@
 title: Errores y soluciones
 description: Errores reales encontrados armando esta plataforma, con causa y fix.
 section: Guías
-order: 4
+order: 5
 ---
 
 Esta lista incluye errores **reales** que aparecieron mientras se armaba y probaba
@@ -49,7 +49,16 @@ un `git clone` limpio como el que hace CI, si no están committeados, no existen
 **Solución:** sacá esas líneas de `android/.gitignore` y commiteá los archivos
 del wrapper.
 
+## "No se pudo abrir el keystore con ANDROID_KEYSTORE_PASSWORD + ANDROID_KEY_ALIAS"
+
+**Causa:** contraseña o alias incorrectos, o un `ANDROID_KEYSTORE_BASE64`
+incompleto. Probalo local con `keytool -list -v -keystore release.jks -alias <alias>`
+y regenerá el base64 si hace falta.
+
 ## El APK/AAB sale sin firmar aunque configuré los secrets
+
+**Síntoma:** falla **Verify Android signature** con *"está firmado con otro
+certificado"* o *"no está firmado"*.
 
 **Causa:** tu `build.gradle(.kts)` no lee `key.properties`.
 
@@ -92,6 +101,30 @@ aplica — el scheme es siempre `App` (nombre fijo del template).
 
 **Causa:** hacen falta **ambos** secrets, `IOS_CERTIFICATE_BASE64` **y**
 `IOS_PROVISION_PROFILE_BASE64` — si falta cualquiera, cae al build sin firmar.
+
+## Falla "Import signing certificate & provisioning profile"
+
+El paso valida certificado y perfil antes de compilar y el error dice qué
+corregir: contraseña del `.p12`, perfil vencido, certificado que no está en el
+perfil, tipo de perfil distinto de `ios_export_method`, o `IOS_TEAM_ID` de otra
+cuenta (es opcional: se lee del perfil).
+
+## Publicar: "Version code already used" / "bundle version must be higher"
+
+Pasá `build_number: ${{ github.run_number }}` y, en React Native/Capacitor, hacé
+que `build.gradle` lea `-PversionCode` (ver [Publicar en tiendas](/docs/publishing)).
+
+## Google Play: "Package not found" o "caller does not have permission"
+
+La app tiene que existir en Play Console con una primera versión subida a mano,
+y la service account tiene que estar invitada con permiso de publicación. Si la
+app nunca se publicó, usá `play_release_status: draft`.
+
+## TestFlight: `altool` falla con "Authentication failed"
+
+Revisá que `APP_STORE_CONNECT_API_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID` y el
+`.p8` correspondan a la misma clave, y que la app exista en App Store Connect
+con el bundle ID del perfil.
 
 ## El proyecto no se detecta (`project_type: unknown`)
 

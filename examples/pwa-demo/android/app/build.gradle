@@ -17,7 +17,8 @@ android {
         applicationId "com.shadownrx.pwademo"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // CI passes -PversionCode=<build_number> so every store upload gets a new one.
+        versionCode project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

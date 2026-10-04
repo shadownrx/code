@@ -13,11 +13,11 @@ Actions.
 ```
   ███████╗██╗  ██╗ █████╗ ██████╗  ██████╗ ██╗    ██╗███╗   ██╗██████╗ ██╗  ██╗
   ...
-  /code · CI gratis para Android, iOS y Electron · v2.0.1
+  /code · CI gratis para Android, iOS y Electron · v2.2.0
 
   ✔ Proyecto detectado: React Native
 
-  ━━━━━━━━━━━━──────────── Paso 3/4 · Firma
+  ━━━━━━━━━━━━──────────── Paso 3/5 · Firma
 ✔ ¿Ya tenés listos los secrets de firma (keystore / certificado de Apple)? … yes
 
   ╭─ Pipeline en GitHub Actions ───────────────────────────────────────────╮
@@ -44,6 +44,8 @@ Actions y una vista previa del YAML con resaltado de sintaxis. Respeta
 | `-t`, `--type <tipo>` | Fija el tipo: `flutter`, `react-native`, `pwa`, `electron` o `auto` |
 | `--target <t>` | Qué compilar (no Electron): `both`, `android` o `ios` |
 | `--release` | Adjunta los builds a un GitHub Release en tags `v*` |
+| `--play-store` | Sube el `.aab` firmado a Google Play (track `internal`) en tags `v*` |
+| `--testflight` | Sube el `.ipa` firmado a TestFlight en tags `v*` |
 | `--dry-run` | Muestra el workflow sin escribir nada |
 | `-f`, `--force` | Sobrescribe `build.yml` sin preguntar |
 | `--cwd <dir>` | Proyecto a configurar (por defecto, el directorio actual) |
@@ -51,6 +53,7 @@ Actions y una vista previa del YAML con resaltado de sintaxis. Respeta
 
 ```bash
 npx shadownrx-code -y --release            # CI sin preguntas, con releases
+npx shadownrx-code -y --play-store --testflight   # publicar en tiendas al pushear un tag
 npx shadownrx-code -t flutter --dry-run    # solo previsualizar
 ```
 
@@ -149,7 +152,7 @@ Expone dos tools:
 | Tool | Qué hace |
 |---|---|
 | `detect_project_type` | Solo lectura: reporta si un directorio es Flutter, React Native, PWA o Electron. No escribe nada. |
-| `setup_mobile_ci` | Detecta el tipo de proyecto (o recibe `project_type` explícito) y escribe `.github/workflows/build.yml` — mismos parámetros que el CLI interactivo (`build_android`, `build_ios`, `build_electron`, `create_release`), más `overwrite` para confirmar la sobrescritura si el archivo ya existe. |
+| `setup_mobile_ci` | Detecta el tipo de proyecto (o recibe `project_type` explícito) y escribe `.github/workflows/build.yml` — mismos parámetros que el CLI interactivo (`build_android`, `build_ios`, `build_electron`, `create_release`, `publish_play_store`, `publish_testflight`), más `overwrite` para confirmar la sobrescritura si el archivo ya existe. |
 
 Ambas tools están cubiertas por tests de punta a punta contra el servidor
 real (no un mock): `mcp-server.test.js` levanta `mcp-server.js` como
@@ -169,6 +172,7 @@ detalle de cada input está documentado en
 | Tipo de proyecto (auto-detectado o elegido) | `project_type` |
 | Qué compilar (Android / iOS / ambas) — no aplica a Electron | `build_android`, `build_ios` |
 | ¿Adjuntar a un GitHub Release en tags? | `create_release` (incluye el bloque `permissions: contents: write` requerido) |
+| ¿Publicar en las tiendas al pushear un tag? | `publish_play_store` / `publish_testflight` en tags `v*`, más `build_number: ${{ github.run_number }}` (y `ios_export_method: app-store` con TestFlight) |
 
 Para proyectos Electron, en lugar de `build_android`/`build_ios` se emite
 `build_electron: true` (siempre compila para los tres sistemas operativos).

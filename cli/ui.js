@@ -224,7 +224,7 @@ export const sym = {
  * ASCII flow of the jobs build-mobile.yml will run for this configuration,
  * mirroring the real job graph (detect → build-* → notify).
  */
-export function pipeline({ projectType, buildAndroid, buildIos, createRelease }) {
+export function pipeline({ projectType, buildAndroid, buildIos, createRelease, publishPlayStore, publishTestflight }) {
   const jobs = [];
   if (projectType === 'electron') {
     jobs.push(['electron · linux', 'ubuntu', '.AppImage']);
@@ -250,7 +250,14 @@ export function pipeline({ projectType, buildAndroid, buildIos, createRelease })
     pipe,
     node(c.magenta('◆'), 'notify', 'ubuntu', c.gray('resumen · Slack opcional')),
   ];
-  if (createRelease) lines.push(`${padEnd(c.gray('└─▶'), 4)}${c.yellow(padEnd('GitHub Release', JOB + RUN))} ${c.gray('adjunta los builds en tags v*')}`);
+  const extras = [];
+  if (projectType !== 'electron' && buildAndroid && publishPlayStore) extras.push(['Google Play', 'sube el .aab (internal) en tags v*']);
+  if (projectType !== 'electron' && buildIos && publishTestflight) extras.push(['TestFlight', 'sube el .ipa en tags v*']);
+  if (createRelease) extras.push(['GitHub Release', 'adjunta los builds en tags v*']);
+  extras.forEach(([name, note], i) => {
+    const glyph = i === extras.length - 1 ? '└─▶' : '├─▶';
+    lines.push(`${padEnd(c.gray(glyph), 4)}${c.yellow(padEnd(name, JOB + RUN))} ${c.gray(note)}`);
+  });
   return lines;
 }
 

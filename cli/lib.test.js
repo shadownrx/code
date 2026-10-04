@@ -87,3 +87,35 @@ test('electron project type emits build_electron instead of build_android/build_
   assert.doesNotMatch(yaml, /build_android/);
   assert.doesNotMatch(yaml, /build_ios/);
 });
+
+test('play store publishing only fires on v* tags and stamps a build number', () => {
+  const yaml = buildWorkflowYaml({ projectType: 'flutter', buildAndroid: true, buildIos: true, createRelease: false, publishPlayStore: true });
+  assert.match(yaml, /publish_play_store: \$\{\{ startsWith\(github\.ref, 'refs\/tags\/v'\) \}\}/);
+  assert.match(yaml, /play_track: internal/);
+  assert.match(yaml, /build_number: \$\{\{ github\.run_number \}\}/);
+  assert.doesNotMatch(yaml, /publish_testflight/);
+});
+
+test('testflight pins the app-store export method for every build', () => {
+  const yaml = buildWorkflowYaml({ projectType: 'pwa', buildAndroid: true, buildIos: true, createRelease: false, publishTestflight: true });
+  assert.match(yaml, /ios_export_method: app-store/);
+  assert.match(yaml, /publish_testflight: \$\{\{ startsWith\(github\.ref, 'refs\/tags\/v'\) \}\}/);
+  assert.doesNotMatch(yaml, /publish_play_store/);
+});
+
+test('store publishing is dropped for platforms that are not built', () => {
+  const yaml = buildWorkflowYaml({
+    projectType: 'react-native',
+    buildAndroid: false,
+    buildIos: true,
+    createRelease: false,
+    publishPlayStore: true,
+  });
+  assert.doesNotMatch(yaml, /publish_play_store/);
+  assert.doesNotMatch(yaml, /build_number/);
+});
+
+test('electron ignores store publishing', () => {
+  const yaml = buildWorkflowYaml({ projectType: 'electron', buildElectron: true, publishPlayStore: true, publishTestflight: true });
+  assert.doesNotMatch(yaml, /publish_/);
+});
