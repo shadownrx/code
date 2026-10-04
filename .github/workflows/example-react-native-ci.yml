@@ -10,13 +10,11 @@ on:
       - "examples/react-native-demo/**"
       - ".github/workflows/build-mobile.yml"
       - ".github/workflows/example-react-native-ci.yml"
-      - ".github/actions/detect-project/**"
   pull_request:
     paths:
       - "examples/react-native-demo/**"
       - ".github/workflows/build-mobile.yml"
       - ".github/workflows/example-react-native-ci.yml"
-      - ".github/actions/detect-project/**"
   workflow_dispatch:
 
 jobs:

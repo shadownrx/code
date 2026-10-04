@@ -9,7 +9,7 @@ export const PROJECT_LABELS = {
 };
 
 /**
- * Same detection rules as .github/actions/detect-project/action.yml,
+ * Same detection rules as the `detect` job in .github/workflows/build-mobile.yml,
  * ported to Node so the CLI can guess before asking.
  */
 export function detectProjectType(cwd) {

@@ -57,8 +57,6 @@ esta plataforma.
     example-react-native-ci.yml  # autotest: corre build-mobile.yml sobre examples/react-native-demo
     example-pwa-ci.yml           # autotest: corre build-mobile.yml sobre examples/pwa-demo
     example-electron-ci.yml      # autotest: corre build-mobile.yml sobre examples/electron-demo
-  actions/
-    detect-project/          # detecta si el repo consumidor es Flutter, React Native, PWA o Electron
 docs/
   USAGE.md                   # cómo conectar tu repo, paso a paso (genérico)
   FLUTTER.md                 # guía específica de Flutter
