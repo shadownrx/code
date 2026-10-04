@@ -22,7 +22,12 @@ usa la plataforma (`Settings → Secrets and variables → Actions`).
    - `ANDROID_KEY_PASSWORD`
 
 4. El workflow decodifica el keystore en `android/keystore/release.jks` y escribe
-   `android/key.properties`. Para que Gradle lo use, tu `android/app/build.gradle.kts`
+   `android/key.properties` con `storeFile` como **ruta absoluta** a ese `.jks`, así
+   funciona tanto si tu `build.gradle` usa `file(...)` (relativo a `android/app/`)
+   como `rootProject.file(...)` (relativo a `android/`). En los ejemplos usamos
+   `rootProject.file(...)` para que un `key.properties` local con una ruta relativa
+   (p. ej. `storeFile=keystore/release.jks`) se resuelva desde `android/`, igual que el
+   propio `key.properties`. Para que Gradle lo use, tu `android/app/build.gradle.kts`
    (Kotlin DSL, la plantilla actual de Flutter) debe leer ese archivo — ver
    [`examples/flutter-demo/android/app/build.gradle.kts`](../examples/flutter-demo/android/app/build.gradle.kts)
    para el patrón completo ya aplicado:
@@ -43,7 +48,7 @@ usa la plataforma (`Settings → Secrets and variables → Actions`).
                create("release") {
                    keyAlias = keystoreProperties["keyAlias"] as String?
                    keyPassword = keystoreProperties["keyPassword"] as String?
-                   storeFile = (keystoreProperties["storeFile"] as String?)?.let { file(it) }
+                   storeFile = (keystoreProperties["storeFile"] as String?)?.let { rootProject.file(it) }
                    storePassword = keystoreProperties["storePassword"] as String?
                }
            }
@@ -79,7 +84,7 @@ usa la plataforma (`Settings → Secrets and variables → Actions`).
                release {
                    keyAlias keystoreProperties['keyAlias']
                    keyPassword keystoreProperties['keyPassword']
-                   storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                   storeFile keystoreProperties['storeFile'] ? rootProject.file(keystoreProperties['storeFile']) : null
                    storePassword keystoreProperties['storePassword']
                }
            }

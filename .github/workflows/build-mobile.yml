@@ -74,11 +74,30 @@ jobs:
       project_type: ${{ steps.pick.outputs.project_type }}
     steps:
       - uses: actions/checkout@v4
+      # Detection runs inline rather than as a local composite action: in a
+      # reusable workflow, `uses: ./...` resolves against the CALLER's
+      # checkout, where shadownrx/code's .github/actions/ doesn't exist.
       - id: auto
         if: inputs.project_type == 'auto'
-        uses: ./.github/actions/detect-project
-        with:
-          working-directory: ${{ inputs.working_directory }}
+        shell: bash
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          if [ -f "pubspec.yaml" ] && grep -qE "^\s*flutter:" pubspec.yaml; then
+            echo "Detected: Flutter project"
+            echo "project_type=flutter" >> "$GITHUB_OUTPUT"
+          elif [ -f "capacitor.config.ts" ] || [ -f "capacitor.config.json" ]; then
+            echo "Detected: Capacitor (PWA) project"
+            echo "project_type=pwa" >> "$GITHUB_OUTPUT"
+          elif [ -f "package.json" ] && grep -qE '"electron(-builder)?"' package.json; then
+            echo "Detected: Electron project"
+            echo "project_type=electron" >> "$GITHUB_OUTPUT"
+          elif [ -f "package.json" ] && grep -q '"react-native"' package.json; then
+            echo "Detected: React Native project"
+            echo "project_type=react-native" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not auto-detect project type (no pubspec.yaml with flutter:, no capacitor.config.ts/json, no package.json with electron/react-native)"
+            echo "project_type=unknown" >> "$GITHUB_OUTPUT"
+          fi
       - id: pick
         shell: bash
         run: |
@@ -110,8 +129,12 @@ jobs:
         run: |
           mkdir -p android/keystore
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/keystore/release.jks
+          # Absolute path: Gradle's file() in android/app/build.gradle resolves
+          # relative paths against android/app/, not android/, so a relative
+          # storeFile only works if the project uses rootProject.file(). An
+          # absolute path works with either pattern.
           cat > android/key.properties <<EOF
-          storeFile=keystore/release.jks
+          storeFile=$PWD/android/keystore/release.jks
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}

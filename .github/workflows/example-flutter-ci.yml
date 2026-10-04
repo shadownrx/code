@@ -10,13 +10,11 @@ on:
       - "examples/flutter-demo/**"
       - ".github/workflows/build-mobile.yml"
       - ".github/workflows/example-flutter-ci.yml"
-      - ".github/actions/detect-project/**"
   pull_request:
     paths:
       - "examples/flutter-demo/**"
       - ".github/workflows/build-mobile.yml"
       - ".github/workflows/example-flutter-ci.yml"
-      - ".github/actions/detect-project/**"
   workflow_dispatch:
 
 jobs:
