@@ -48,3 +48,18 @@ test('highlightYaml keeps the YAML text intact once colors are stripped', () => 
   assert.equal(plain + '\n', yaml);
   setColor(false);
 });
+
+test('pipeline shows store uploads only for built platforms', () => {
+  setColor(false);
+  const lines = pipeline({
+    projectType: 'flutter',
+    buildAndroid: true,
+    buildIos: false,
+    createRelease: true,
+    publishPlayStore: true,
+    publishTestflight: true,
+  }).join('\n');
+  assert.match(lines, /├─▶ Google Play/);
+  assert.match(lines, /└─▶ GitHub Release/);
+  assert.doesNotMatch(lines, /TestFlight/);
+});

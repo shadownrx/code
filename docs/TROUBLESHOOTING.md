@@ -106,10 +106,22 @@ Android (compatible hacia atrás con Flutter y React Native, así que no rompe l
 otros dos flujos). Si en el futuro Capacitor exige una versión aún más nueva,
 subí el `java-version` del paso `actions/setup-java@v4` en `build-android`.
 
+### "No se pudo abrir el keystore con ANDROID_KEYSTORE_PASSWORD + ANDROID_KEY_ALIAS"
+
+**Causa:** la contraseña o el alias no corresponden al keystore, o
+`ANDROID_KEYSTORE_BASE64` no es el `.jks` completo (p. ej. se copió con saltos de
+línea cortados).
+
+**Solución:** probalo en tu máquina con
+`keytool -list -v -keystore release.jks -alias <alias>` y la misma contraseña.
+Si abre ahí, volvé a generar el base64 (`base64 -i release.jks | pbcopy`) y
+pegalo de nuevo en el secret.
+
 ### El APK/AAB sale sin firmar aunque configuré los secrets de Android
 
-**Síntoma:** el build compila bien, pero el artefacto sigue firmado con la clave
-debug.
+**Síntoma:** falla el paso **Verify Android signature** con *"está firmado con
+otro certificado"* o *"no está firmado"*. (Antes de que existiera esa
+verificación, el build salía verde con la clave debug.)
 
 **Causa más común:** tu `android/app/build.gradle` (o `.kts`) no lee
 `key.properties`. El workflow decodifica el keystore y escribe ese archivo, pero
@@ -203,10 +215,64 @@ secrets, `IOS_CERTIFICATE_BASE64` **y** `IOS_PROVISION_PROFILE_BASE64` — si fa
 cualquiera de los dos, el workflow cae automáticamente al build sin firmar (es
 intencional, para no romper el pipeline por una config incompleta).
 
-**Solución:** confirmá que ambos secrets estén configurados, y que
-`IOS_TEAM_ID` corresponda a la cuenta de Apple Developer dueña del certificado y
-el perfil de aprovisionamiento — un Team ID incorrecto hace que `xcodebuild
--exportArchive` falle igual, ya con los certificados importados.
+**Solución:** confirmá que ambos secrets estén configurados.
+
+### Falla "Import signing certificate & provisioning profile"
+
+Ese paso valida certificado + perfil antes de compilar. Cada error dice qué
+corregir:
+
+| Mensaje | Qué hacer |
+|---|---|
+| *IOS_CERTIFICATE_PASSWORD es incorrecta o el .p12 no es válido* | Reexportá el `.p12` desde Keychain Access con una contraseña nueva y actualizá ambos secrets. |
+| *El perfil '…' venció* | Regeneralo en developer.apple.com → Profiles y actualizá `IOS_PROVISION_PROFILE_BASE64`. |
+| *El certificado … no está incluido en el perfil* | El perfil se generó con otro certificado (o el tuyo venció). Editá el perfil, marcá el certificado actual y descargalo de nuevo. |
+| *El perfil es de tipo app-store, pero el export es ad-hoc* (o al revés) | Hacé coincidir `ios_export_method` con el perfil, o generá el perfil del tipo correcto. |
+| *IOS_TEAM_ID es X pero el perfil pertenece al team Y* | Corregí `IOS_TEAM_ID` o borralo (es opcional: se lee del perfil). |
+
+### Falla "Verify iOS signature"
+
+**Causa:** el `.ipa` salió firmado con otro team o con otro perfil que el
+cargado, normalmente porque el proyecto tiene varios targets de app y se tomó
+otro. Revisá el warning *"Ningún target tiene PRODUCT_BUNDLE_IDENTIFIER=…"* del
+paso **Configure Xcode project for manual signing**: el bundle ID del perfil
+tiene que ser igual al del target de la app.
+
+## Errores de publicación en tiendas
+
+### "publish_play_store exige firma real" / "publish_testflight exige firma de iOS"
+
+Publicar necesita la firma real configurada ([`SIGNING.md`](./SIGNING.md)). Un
+build con `signing_self_test` nunca se publica.
+
+### "Version code N has already been used" (Google Play) / "The bundle version must be higher" (TestFlight)
+
+**Causa:** el número de build ya se subió antes.
+
+**Solución:** pasá `build_number: ${{ github.run_number }}` y, en React
+Native/Capacitor, hacé que `android/app/build.gradle` lea `-PversionCode` (ver
+[`PUBLISHING.md`](./PUBLISHING.md#número-de-build-build_number)). Si ya publicaste
+un número mayor que el `run_number` actual, subí uno manual más alto.
+
+### Google Play: "Package not found" o "The caller does not have permission"
+
+**Causa:** la app todavía no existe en Play Console (la primera versión se sube a
+mano), o la service account no fue invitada con permiso de publicación.
+
+**Solución:** ver los pasos 1 y 2 de Google Play en [`PUBLISHING.md`](./PUBLISHING.md#google-play).
+
+### Google Play: "Only releases with status draft may be created on draft app"
+
+**Solución:** `play_release_status: draft` hasta que la app tenga su primera
+versión publicada.
+
+### TestFlight: falla `altool` con "Authentication failed" o "No suitable application records were found"
+
+**Causa:** clave de API incorrecta (Key ID / Issuer ID / `.p8` que no se
+corresponden), o la app no existe en App Store Connect con ese bundle ID.
+
+**Solución:** revisá los tres secrets `APP_STORE_CONNECT_*` y que la app esté
+creada en App Store Connect con el mismo bundle ID del perfil.
 
 ## Errores de build de Electron
 

@@ -47,6 +47,51 @@ on:
         type: boolean
         required: false
         default: false
+      build_number:
+        description: "Build number stamped on the app (Android versionCode, iOS CFBundleVersion). Stores reject a repeated number — e.g. pass github.run_number. Empty keeps the project's own value."
+        type: string
+        required: false
+        default: ""
+      verify_signing:
+        description: "When signing secrets are present, check the produced .apk/.aab/.ipa are really signed with them and fail the build if not"
+        type: boolean
+        required: false
+        default: true
+      signing_self_test:
+        description: "Without Android signing secrets, generate a throwaway keystore so the whole signing path (key.properties → Gradle → verification) still runs. For CI of the platform itself; never publishable."
+        type: boolean
+        required: false
+        default: false
+      ios_export_method:
+        description: "ad-hoc | app-store | development | enterprise. Must match the type of IOS_PROVISION_PROFILE_BASE64. Forced to app-store when publish_testflight is true."
+        type: string
+        required: false
+        default: "ad-hoc"
+      publish_play_store:
+        description: "Upload the signed .aab to Google Play (needs GOOGLE_PLAY_SERVICE_ACCOUNT_JSON). Typically set to startsWith(github.ref, 'refs/tags/v')."
+        type: boolean
+        required: false
+        default: false
+      play_track:
+        description: "Google Play track: internal | alpha | beta | production (or a custom closed-testing track name)"
+        type: string
+        required: false
+        default: "internal"
+      play_release_status:
+        description: "completed | draft | inProgress. Use draft while the app has never been published on Play."
+        type: string
+        required: false
+        default: "completed"
+      android_package_name:
+        description: "Android applicationId for Google Play. Empty reads it from the built APK."
+        type: string
+        required: false
+        default: ""
+      publish_testflight:
+        description: "Upload the signed .ipa to App Store Connect / TestFlight (needs the APP_STORE_CONNECT_* secrets and an App Store provisioning profile)"
+        type: boolean
+        required: false
+        default: false
     secrets:
       ANDROID_KEYSTORE_BASE64:
         required: false
@@ -63,6 +108,14 @@ on:
       IOS_PROVISION_PROFILE_BASE64:
         required: false
       IOS_TEAM_ID:
+        required: false
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:
+        required: false
+      APP_STORE_CONNECT_API_KEY_ID:
+        required: false
+      APP_STORE_CONNECT_ISSUER_ID:
+        required: false
+      APP_STORE_CONNECT_API_KEY_BASE64:
         required: false
       SLACK_WEBHOOK_URL:
         required: false
@@ -111,8 +164,13 @@ jobs:
     needs: detect
     if: inputs.build_android && needs.detect.outputs.project_type != 'unknown' && needs.detect.outputs.project_type != 'electron'
     runs-on: ubuntu-latest
+    outputs:
+      signing: ${{ steps.keystore.outputs.mode }}
+      play_store: ${{ steps.play_prep.outputs.skip_reason || steps.play.outcome }}
     env:
       HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      BUILD_NUMBER: ${{ inputs.build_number }}
     steps:
       - uses: actions/checkout@v4
 
@@ -123,22 +181,66 @@ jobs:
           # backward-compatible for Flutter/React Native's Gradle setup too.
           java-version: "21"
 
-      - name: Decode Android signing keystore (optional)
-        if: env.HAS_ANDROID_KEYSTORE == 'true'
+      # Decodes the real keystore (or, with signing_self_test, generates a
+      # throwaway one) and checks the password/alias actually open it, so a
+      # wrong secret fails here with a clear message instead of deep inside
+      # Gradle. Its certificate fingerprint is what "Verify Android
+      # signature" later compares every .apk/.aab against.
+      - name: Prepare Android signing keystore
+        id: keystore
         working-directory: ${{ inputs.working_directory }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          SELF_TEST: ${{ inputs.signing_self_test }}
         run: |
+          if [ "$HAS_ANDROID_KEYSTORE" = "true" ]; then
+            mode=real
+          elif [ "$SELF_TEST" = "true" ]; then
+            mode=self-test
+          else
+            echo "Sin ANDROID_KEYSTORE_BASE64: el build sale con la firma por defecto de la plantilla (sin firma de release)."
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           mkdir -p android/keystore
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/keystore/release.jks
+          KS="$PWD/android/keystore/release.jks"
+          if [ "$mode" = "real" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
+          else
+            KEYSTORE_PASSWORD="selftest-$(openssl rand -hex 12)"
+            KEY_PASSWORD="$KEYSTORE_PASSWORD"
+            KEY_ALIAS="selftest"
+            echo "::add-mask::$KEYSTORE_PASSWORD"
+            keytool -genkeypair -keystore "$KS" -storetype PKCS12 \
+              -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 2 -dname "CN=shadownrx signing self-test" >/dev/null 2>&1
+            echo "::notice::signing_self_test: firmando con un keystore descartable generado en este run (no publicable)."
+          fi
+
+          if ! CERT=$(keytool -list -v -keystore "$KS" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" 2>&1); then
+            echo "::error::No se pudo abrir el keystore con ANDROID_KEYSTORE_PASSWORD + ANDROID_KEY_ALIAS. Revisá esos secrets (o que ANDROID_KEYSTORE_BASE64 sea el .jks completo en base64). keytool: $(echo "$CERT" | grep -m1 'keytool error')"
+            exit 1
+          fi
+          SHA256=$(echo "$CERT" | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr 'A-F' 'a-f')
+
           # Absolute path: Gradle's file() in android/app/build.gradle resolves
           # relative paths against android/app/, not android/, so a relative
           # storeFile only works if the project uses rootProject.file(). An
           # absolute path works with either pattern.
           cat > android/key.properties <<EOF
-          storeFile=$PWD/android/keystore/release.jks
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          storeFile=$KS
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
           EOF
+
+          echo "Keystore OK ($mode) — certificado SHA-256: $SHA256"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
 
       # --- Flutter ---
       - uses: subosito/flutter-action@v2
@@ -156,8 +258,8 @@ jobs:
         if: needs.detect.outputs.project_type == 'flutter'
         working-directory: ${{ inputs.working_directory }}
         run: |
-          flutter build apk --release
-          flutter build appbundle --release
+          flutter build apk --release ${BUILD_NUMBER:+--build-number=$BUILD_NUMBER}
+          flutter build appbundle --release ${BUILD_NUMBER:+--build-number=$BUILD_NUMBER}
 
       # --- React Native ---
       - uses: actions/setup-node@v4
@@ -172,12 +274,14 @@ jobs:
         working-directory: ${{ inputs.working_directory }}
         run: npm ci
 
+      # -PversionCode only takes effect if android/app/build.gradle reads it
+      # (see docs/PUBLISHING.md); otherwise Gradle ignores the property.
       - name: gradlew assembleRelease + bundleRelease
         if: needs.detect.outputs.project_type == 'react-native'
         working-directory: ${{ inputs.working_directory }}/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease
+          ./gradlew assembleRelease bundleRelease ${BUILD_NUMBER:+-PversionCode=$BUILD_NUMBER}
 
       # --- Capacitor (PWA wrapped as a native app) ---
       - uses: actions/setup-node@v4
@@ -204,15 +308,75 @@ jobs:
         working-directory: ${{ inputs.working_directory }}/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease
+          ./gradlew assembleRelease bundleRelease ${BUILD_NUMBER:+-PversionCode=$BUILD_NUMBER}
 
       - name: Collect Android artifacts
         working-directory: ${{ inputs.working_directory }}
         run: |
           mkdir -p android-artifacts
-          find . -name "*.apk" -not -path "*/intermediates/*" -exec cp {} android-artifacts/ \;
-          find . -name "*.aab" -not -path "*/intermediates/*" -exec cp {} android-artifacts/ \;
+          find . -name "*.apk" -not -path "*/intermediates/*" -not -path "./android-artifacts/*" -exec cp {} android-artifacts/ \;
+          find . -name "*.aab" -not -path "*/intermediates/*" -not -path "./android-artifacts/*" -exec cp {} android-artifacts/ \;
           ls -la android-artifacts
+
+      # The silent failure this catches: secrets are set, but the project's
+      # build.gradle never reads android/key.properties, so Gradle quietly
+      # signs with the debug key (or not at all) and the build looks green
+      # until the Play Console rejects the upload.
+      - name: Verify Android signature
+        if: steps.keystore.outputs.mode != 'none' && inputs.verify_signing
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          EXPECTED: ${{ steps.keystore.outputs.sha256 }}
+        run: |
+          shopt -s nullglob
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          HINT="tu android/app/build.gradle no está usando android/key.properties para el buildType release — ver docs/SIGNING.md"
+          fail=0
+          checked=0
+
+          for f in android-artifacts/*.apk; do
+            checked=$((checked + 1))
+            if ! out=$("$BT/apksigner" verify --print-certs "$f" 2>&1); then
+              echo "::error::$f no tiene una firma válida: $HINT. apksigner: $(echo "$out" | head -1)"
+              fail=1
+              continue
+            fi
+            # Every signer line, whatever its label ("Signer #1", or
+            # "Signer (minSdkVersion=…)" with v3.1/rotation).
+            got=$(echo "$out" | grep -i 'certificate SHA-256 digest:' | sed 's/.*digest: *//' | tr -d ' \t\r' | tr 'A-F' 'a-f' | sort -u | paste -sd, -)
+            if [ -z "$got" ]; then
+              echo "::error::$f: no pude leer el certificado de la salida de apksigner ($("$BT/apksigner" --version 2>&1), $BT)."
+              echo "$out"
+              fail=1
+            elif [[ ",$got," != *",$EXPECTED,"* ]]; then
+              echo "::error::$f está firmado con otro certificado ($got, esperado $EXPECTED): $HINT"
+              fail=1
+            else
+              echo "✓ $f firmado con el keystore de release"
+            fi
+          done
+
+          for f in android-artifacts/*.aab; do
+            checked=$((checked + 1))
+            if ! jarsigner -verify "$f" 2>&1 | grep -q "jar verified"; then
+              echo "::error::$f no está firmado: $HINT"
+              fail=1
+              continue
+            fi
+            got=$(keytool -printcert -jarfile "$f" | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr 'A-F' 'a-f')
+            if [ "$got" != "$EXPECTED" ]; then
+              echo "::error::$f está firmado con otro certificado ($got, esperado $EXPECTED): $HINT"
+              fail=1
+            else
+              echo "✓ $f firmado con el keystore de release"
+            fi
+          done
+
+          if [ "$checked" -eq 0 ]; then
+            echo "::error::No se generó ningún .apk/.aab para verificar."
+            exit 1
+          fi
+          exit $fail
 
       - uses: actions/upload-artifact@v4
         with:
@@ -220,10 +384,74 @@ jobs:
           path: ${{ inputs.working_directory }}/android-artifacts/*
           if-no-files-found: warn
 
+      - name: Prepare Google Play upload
+        id: play_prep
+        if: inputs.publish_play_store
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          MODE: ${{ steps.keystore.outputs.mode }}
+          PACKAGE_NAME: ${{ inputs.android_package_name }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "::notice::Pull request: no se publica en Google Play."
+            echo "skip_reason=omitido (pull request)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$MODE" != "real" ]; then
+            echo "::error::publish_play_store exige firma real: configurá ANDROID_KEYSTORE_BASE64 y compañía (signing_self_test no sirve para publicar). Ver docs/SIGNING.md."
+            exit 1
+          fi
+          if [ "$HAS_PLAY_CREDENTIALS" != "true" ]; then
+            echo "::error::publish_play_store está activo pero falta el secret GOOGLE_PLAY_SERVICE_ACCOUNT_JSON. Ver docs/PUBLISHING.md."
+            exit 1
+          fi
+
+          shopt -s nullglob
+          aabs=(android-artifacts/*.aab)
+          if [ ${#aabs[@]} -eq 0 ]; then
+            echo "::error::No hay ningún .aab para subir a Google Play."
+            exit 1
+          fi
+          if [ ${#aabs[@]} -gt 1 ]; then
+            echo "::warning::Se generó más de un .aab (${aabs[*]}); se sube ${aabs[0]}."
+          fi
+
+          if [ -z "$PACKAGE_NAME" ]; then
+            BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+            apk=$(ls android-artifacts/*.apk | head -1)
+            PACKAGE_NAME=$("$BT/aapt2" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          fi
+          if [ -z "$PACKAGE_NAME" ]; then
+            echo "::error::No pude leer el applicationId del APK. Pasalo con el input android_package_name."
+            exit 1
+          fi
+
+          echo "Subiendo ${aabs[0]} como $PACKAGE_NAME → track ${{ inputs.play_track }} (${{ inputs.play_release_status }})"
+          echo "package=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "aab=$PWD/${aabs[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Google Play
+        id: play
+        if: steps.play_prep.outputs.aab != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ steps.play_prep.outputs.package }}
+          releaseFiles: ${{ steps.play_prep.outputs.aab }}
+          track: ${{ inputs.play_track }}
+          status: ${{ inputs.play_release_status }}
+
   build-ios:
     needs: detect
     if: inputs.build_ios && needs.detect.outputs.project_type != 'unknown' && needs.detect.outputs.project_type != 'electron'
     runs-on: macos-latest
+    outputs:
+      signing: ${{ steps.signing.outputs.enabled == 'true' && 'real' || 'none' }}
+      testflight: ${{ steps.testflight.outputs.skip_reason || steps.testflight.outcome }}
+    env:
+      BUILD_NUMBER: ${{ inputs.build_number }}
+      # Uploading to TestFlight only accepts an App Store-signed .ipa.
+      EXPORT_METHOD: ${{ inputs.publish_testflight && 'app-store' || inputs.ios_export_method }}
     steps:
       - uses: actions/checkout@v4
 
@@ -231,46 +459,214 @@ jobs:
         id: signing
         run: echo "enabled=${{ secrets.IOS_CERTIFICATE_BASE64 != '' && secrets.IOS_PROVISION_PROFILE_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
 
+      # Imports the certificate and profile, then checks they actually fit
+      # together before spending 10+ minutes of macOS time on a build that
+      # would only fail at export: profile not expired, certificate listed
+      # in the profile, profile type matching the export method, team ID
+      # matching. Each mismatch gets its own error message.
       - name: Import signing certificate & provisioning profile
+        id: profile
         if: steps.signing.outputs.enabled == 'true'
         env:
           IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
           IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
           IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
         run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
           KEYCHAIN_PASSWORD=$(uuidgen)
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -lut 21600 build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Prepend to the search list (not just default-keychain) so
+          # codesign and xcodebuild both find the identity.
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN"
 
-          echo "$IOS_CERTIFICATE_BASE64" | base64 -d > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$IOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          rm certificate.p12
+          echo "$IOS_CERTIFICATE_BASE64" | base64 -d > "$RUNNER_TEMP/certificate.p12"
+          if ! security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" -P "$IOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security; then
+            echo "::error::No se pudo importar IOS_CERTIFICATE_BASE64: IOS_CERTIFICATE_PASSWORD es incorrecta o el .p12 no es válido."
+            exit 1
+          fi
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
 
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$IOS_PROVISION_PROFILE_BASE64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          echo "$IOS_PROVISION_PROFILE_BASE64" | base64 -d > "$RUNNER_TEMP/profile.mobileprovision"
+          if ! security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist" 2>/dev/null; then
+            echo "::error::IOS_PROVISION_PROFILE_BASE64 no es un .mobileprovision válido."
+            exit 1
+          fi
+
+          export IDENTITIES="$(security find-identity -v -p codesigning "$KEYCHAIN")"
+          echo "$IDENTITIES"
+          python3 - "$RUNNER_TEMP/profile.mobileprovision" "$RUNNER_TEMP/profile.plist" <<'PY'
+          import datetime, hashlib, os, plistlib, re, shutil, sys
+
+          profile_path, plist_path = sys.argv[1], sys.argv[2]
+          with open(plist_path, "rb") as fh:
+              p = plistlib.load(fh)
+
+          errors = []
+          name, uuid, team = p["Name"], p["UUID"], p["TeamIdentifier"][0]
+          ent = p.get("Entitlements", {})
+          app_id = ent.get("application-identifier", "")
+          bundle_id = app_id.split(".", 1)[1] if "." in app_id else ""
+
+          if p.get("ProvisionsAllDevices"):
+              kind = "enterprise"
+          elif p.get("ProvisionedDevices"):
+              kind = "development" if ent.get("get-task-allow") else "ad-hoc"
+          else:
+              kind = "app-store"
+
+          method = os.environ["EXPORT_METHOD"]
+          if method not in ("ad-hoc", "app-store", "development", "enterprise"):
+              errors.append(f"ios_export_method inválido: '{method}' (ad-hoc | app-store | development | enterprise).")
+          elif kind != method:
+              errors.append(
+                  f"El perfil '{name}' es de tipo {kind}, pero el export es {method}. "
+                  f"Generá un perfil de distribución {method} en developer.apple.com o cambiá ios_export_method"
+                  + (" (publish_testflight exige un perfil App Store)." if method == "app-store" else ".")
+              )
+
+          now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+          expires = p["ExpirationDate"].replace(tzinfo=None)
+          if expires < now:
+              errors.append(f"El perfil '{name}' venció el {expires:%Y-%m-%d}. Regeneralo en developer.apple.com.")
+          elif (expires - now).days < 14:
+              print(f"::warning::El perfil '{name}' vence el {expires:%Y-%m-%d}.")
+
+          wanted_team = os.environ.get("IOS_TEAM_ID", "").strip()
+          if wanted_team and wanted_team != team:
+              errors.append(f"IOS_TEAM_ID es {wanted_team} pero el perfil pertenece al team {team}.")
+
+          profile_certs = {hashlib.sha1(c).hexdigest().upper() for c in p.get("DeveloperCertificates", [])}
+          identity_sha1 = identity_name = None
+          for line in os.environ["IDENTITIES"].splitlines():
+              m = re.match(r'\s*\d+\)\s+([0-9A-F]{40})\s+"(.+)"', line)
+              if m and m.group(1) in profile_certs:
+                  identity_sha1, identity_name = m.groups()
+                  break
+          if not identity_sha1:
+              errors.append(
+                  f"El certificado de IOS_CERTIFICATE_BASE64 no está incluido en el perfil '{name}' "
+                  "(o está vencido/revocado). Regenerá el perfil seleccionando ese certificado."
+              )
+
+          for e in errors:
+              print(f"::error::{e}")
+          if errors:
+              sys.exit(1)
+
+          for d in ("~/Library/MobileDevice/Provisioning Profiles",
+                    "~/Library/Developer/Xcode/UserData/Provisioning Profiles"):
+              d = os.path.expanduser(d)
+              os.makedirs(d, exist_ok=True)
+              shutil.copy(profile_path, os.path.join(d, f"{uuid}.mobileprovision"))
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"uuid={uuid}\nname={name}\nteam={team}\nbundle_id={bundle_id}\n")
+              out.write(f"identity={identity_name}\nidentity_sha1={identity_sha1}\n")
+          print(f"Firma OK — perfil '{name}' ({kind}, {bundle_id}, vence {expires:%Y-%m-%d}), identidad '{identity_name}', team {team}")
+          PY
+
+      # Pins the app target to the imported profile with manual signing.
+      # Done in the project file (not as xcodebuild command-line overrides)
+      # so it only touches the app target — global overrides would also hit
+      # Pods/SPM targets, which can't take a provisioning profile.
+      - name: Configure Xcode project for manual signing
+        id: xcodeproj
+        if: steps.signing.outputs.enabled == 'true'
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          TEAM: ${{ steps.profile.outputs.team }}
+          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+          IDENTITY: ${{ steps.profile.outputs.identity }}
+          BUNDLE_ID: ${{ steps.profile.outputs.bundle_id }}
+        run: |
+          PROJECT=$(find ios -maxdepth 2 -name "*.xcodeproj" -not -path "*/Pods/*" | head -1)
+          if [ -z "$PROJECT" ]; then
+            echo "::error::No encontré ningún .xcodeproj dentro de ios/."
+            exit 1
+          fi
+          ruby -e "require 'xcodeproj'" 2>/dev/null || gem install xcodeproj --no-document
+          ruby - "$PROJECT" <<'RUBY'
+          require 'xcodeproj'
+
+          project = Xcodeproj::Project.open(ARGV[0])
+          apps = project.native_targets.select { |t| t.product_type == 'com.apple.product-type.application' }
+          abort "::error::No hay ningún target de app en #{ARGV[0]}." if apps.empty?
+
+          bundle = ENV['BUNDLE_ID']
+          bundle_of = ->(t) { t.build_configurations.find { |c| c.name == 'Release' }&.build_settings&.dig('PRODUCT_BUNDLE_IDENTIFIER') }
+          matching = apps.select { |t| bundle_of.(t) == bundle }
+          targets = matching.empty? ? apps : matching
+          wildcard = bundle.end_with?('*')
+          if matching.empty? && !wildcard
+            puts "::warning::Ningún target tiene PRODUCT_BUNDLE_IDENTIFIER=#{bundle} (el bundle ID del perfil); se configura #{targets.map(&:name).join(', ')} igual."
+          end
+
+          export_bundle = bundle
+          if wildcard || matching.empty?
+            literal = bundle_of.(targets.first)
+            export_bundle = literal if literal && !literal.include?('$(')
+          end
+          abort "::error::No pude resolver el bundle ID de la app (perfil comodín #{bundle} y el target usa una variable). Usá un perfil con bundle ID explícito." if export_bundle.end_with?('*')
+
+          attrs = (project.root_object.attributes['TargetAttributes'] ||= {})
+          targets.each do |t|
+            t.build_configurations.select { |c| c.name == 'Release' }.each do |c|
+              s = c.build_settings
+              s['CODE_SIGN_STYLE'] = 'Manual'
+              s['DEVELOPMENT_TEAM'] = ENV['TEAM']
+              s['CODE_SIGN_IDENTITY'] = ENV['IDENTITY']
+              s['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = ENV['IDENTITY']
+              s['PROVISIONING_PROFILE_SPECIFIER'] = ENV['PROFILE_NAME']
+              s.delete('PROVISIONING_PROFILE')
+            end
+            (attrs[t.uuid] ||= {}).merge!('ProvisioningStyle' => 'Manual', 'DevelopmentTeam' => ENV['TEAM'])
+            puts "Firma manual configurada en el target #{t.name}"
+          end
+          project.save
+          File.write(ENV['GITHUB_OUTPUT'], "bundle_id=#{export_bundle}\n", mode: 'a')
+          RUBY
 
       - name: Generate ExportOptions.plist for signed export
         if: steps.signing.outputs.enabled == 'true'
+        env:
+          TEAM: ${{ steps.profile.outputs.team }}
+          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+          IDENTITY_SHA1: ${{ steps.profile.outputs.identity_sha1 }}
+          BUNDLE_ID: ${{ steps.xcodeproj.outputs.bundle_id }}
         run: |
-          cat > "${{ inputs.working_directory }}/ExportOptions.plist" <<EOF
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>ad-hoc</string>
+            <string>$EXPORT_METHOD</string>
             <key>teamID</key>
-            <string>${{ secrets.IOS_TEAM_ID }}</string>
+            <string>$TEAM</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>$IDENTITY_SHA1</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$BUNDLE_ID</key>
+              <string>$PROFILE_NAME</string>
+            </dict>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
             <key>compileBitcode</key>
             <false/>
           </dict>
           </plist>
           EOF
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
 
       # --- Flutter ---
       - uses: subosito/flutter-action@v2
@@ -289,13 +685,14 @@ jobs:
         working-directory: ${{ inputs.working_directory }}
         run: |
           flutter build ipa --release \
-            --export-options-plist=ExportOptions.plist
+            --export-options-plist="$RUNNER_TEMP/ExportOptions.plist" \
+            ${BUILD_NUMBER:+--build-number=$BUILD_NUMBER}
 
       - name: flutter build ios (unsigned, no Apple Developer account required)
         if: needs.detect.outputs.project_type == 'flutter' && steps.signing.outputs.enabled != 'true'
         working-directory: ${{ inputs.working_directory }}
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign ${BUILD_NUMBER:+--build-number=$BUILD_NUMBER}
           mkdir -p build/ios-unsigned
           ditto -c -k --sequesterRsrc --keepParent build/ios/iphoneos/Runner.app build/ios-unsigned/Runner-unsigned.zip
 
@@ -323,9 +720,10 @@ jobs:
         run: |
           SCHEME=$(xcodebuild -list -json | node -e "const d=JSON.parse(require('fs').readFileSync(0));console.log(d.project.schemes[0]||d.workspace.schemes[0])")
           xcodebuild -workspace *.xcworkspace -scheme "$SCHEME" -sdk iphoneos -configuration Release \
-            -archivePath build/App.xcarchive archive
+            -archivePath build/App.xcarchive archive \
+            ${BUILD_NUMBER:+CURRENT_PROJECT_VERSION=$BUILD_NUMBER}
           xcodebuild -exportArchive -archivePath build/App.xcarchive \
-            -exportOptionsPlist ../ExportOptions.plist -exportPath build/ipa
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath build/ipa
 
       - name: xcodebuild archive (unsigned, no Apple Developer account required)
         if: needs.detect.outputs.project_type == 'react-native' && steps.signing.outputs.enabled != 'true'
@@ -368,9 +766,10 @@ jobs:
         working-directory: ${{ inputs.working_directory }}/ios/App
         run: |
           xcodebuild -project App.xcodeproj -scheme App -sdk iphoneos -configuration Release \
-            -archivePath build/App.xcarchive archive
+            -archivePath build/App.xcarchive archive \
+            ${BUILD_NUMBER:+CURRENT_PROJECT_VERSION=$BUILD_NUMBER}
           xcodebuild -exportArchive -archivePath build/App.xcarchive \
-            -exportOptionsPlist ../../ExportOptions.plist -exportPath build/ipa
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath build/ipa
 
       - name: xcodebuild archive (Capacitor, unsigned, no Apple Developer account required)
         if: needs.detect.outputs.project_type == 'pwa' && steps.signing.outputs.enabled != 'true'
@@ -385,14 +784,88 @@ jobs:
         working-directory: ${{ inputs.working_directory }}
         run: |
           mkdir -p ios-artifacts
-          find . \( -name "*.ipa" -o -name "*-unsigned.zip" \) -exec cp {} ios-artifacts/ \;
+          find . \( -name "*.ipa" -o -name "*-unsigned.zip" \) -not -path "./ios-artifacts/*" -exec cp {} ios-artifacts/ \;
           ls -la ios-artifacts
+
+      # Opens every .ipa and checks the signature is intact and comes from
+      # the imported certificate + profile — not just that xcodebuild exited 0.
+      - name: Verify iOS signature
+        if: steps.signing.outputs.enabled == 'true' && inputs.verify_signing
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          EXPECTED_UUID: ${{ steps.profile.outputs.uuid }}
+          EXPECTED_TEAM: ${{ steps.profile.outputs.team }}
+        run: |
+          shopt -s nullglob
+          ipas=(ios-artifacts/*.ipa)
+          if [ ${#ipas[@]} -eq 0 ]; then
+            echo "::error::La firma de iOS está configurada pero no se generó ningún .ipa."
+            exit 1
+          fi
+          fail=0
+          for ipa in "${ipas[@]}"; do
+            tmp=$(mktemp -d)
+            unzip -q "$ipa" -d "$tmp"
+            app=$(ls -d "$tmp"/Payload/*.app | head -1)
+            if ! codesign --verify --deep --strict "$app" 2>&1; then
+              echo "::error::$ipa: la firma de la app no es válida (codesign --verify)."
+              fail=1
+              continue
+            fi
+            info=$(codesign -dvv "$app" 2>&1)
+            authority=$(echo "$info" | sed -n 's/^Authority=//p' | head -1)
+            team=$(echo "$info" | sed -n 's/^TeamIdentifier=//p')
+            uuid=$(security cms -D -i "$app/embedded.mobileprovision" | plutil -extract UUID raw -o - -)
+            if [ "$team" != "$EXPECTED_TEAM" ] || [ "$uuid" != "$EXPECTED_UUID" ]; then
+              echo "::error::$ipa está firmado con team $team / perfil $uuid, se esperaba team $EXPECTED_TEAM / perfil $EXPECTED_UUID."
+              fail=1
+            else
+              echo "✓ $ipa firmado por \"$authority\" (team $team, perfil $uuid)"
+            fi
+          done
+          exit $fail
 
       - uses: actions/upload-artifact@v4
         with:
           name: ios-build
           path: ${{ inputs.working_directory }}/ios-artifacts/*
           if-no-files-found: warn
+
+      - name: Upload to TestFlight
+        id: testflight
+        if: inputs.publish_testflight
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          SIGNING: ${{ steps.signing.outputs.enabled }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "::notice::Pull request: no se sube a TestFlight."
+            echo "skip_reason=omitido (pull request)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$SIGNING" != "true" ]; then
+            echo "::error::publish_testflight exige firma de iOS con un perfil App Store (IOS_CERTIFICATE_BASE64 + IOS_PROVISION_PROFILE_BASE64). Ver docs/SIGNING.md."
+            exit 1
+          fi
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_KEY_BASE64" ]; then
+            echo "::error::publish_testflight está activo pero faltan secrets: APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_ISSUER_ID y APP_STORE_CONNECT_API_KEY_BASE64. Ver docs/PUBLISHING.md."
+            exit 1
+          fi
+
+          ipa=$(ls ios-artifacts/*.ipa | head -1)
+          # altool looks the key up by ID in this directory.
+          mkdir -p ~/.appstoreconnect/private_keys
+          KEY_FILE=~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          echo "$ASC_KEY_BASE64" | base64 -d > "$KEY_FILE"
+          trap 'rm -f "$KEY_FILE"' EXIT
+
+          echo "Subiendo $ipa a App Store Connect…"
+          xcrun altool --upload-app --type ios --file "$ipa" \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          echo "Subido. Aparece en TestFlight cuando Apple termina de procesarlo (suele tardar 5–30 min)."
 
   build-electron:
     needs: detect
@@ -478,6 +951,20 @@ jobs:
             echo "| iOS | ${{ needs.build-ios.result || 'skipped' }} |"
             echo "| Electron | ${{ needs.build-electron.result || 'skipped' }} |"
             echo ""
+            if [ "${{ needs.build-android.result }}" != "skipped" ] || [ "${{ needs.build-ios.result }}" != "skipped" ]; then
+              echo "| Firma | Estado |"
+              echo "|---|---|"
+              echo "| Android | ${{ needs.build-android.outputs.signing || 'no ejecutado' }}${{ inputs.verify_signing && needs.build-android.result == 'success' && needs.build-android.outputs.signing != 'none' && ' · verificada ✓' || '' }} |"
+              echo "| iOS | ${{ needs.build-ios.outputs.signing || 'no ejecutado' }}${{ inputs.verify_signing && needs.build-ios.result == 'success' && needs.build-ios.outputs.signing == 'real' && ' · verificada ✓' || '' }} |"
+              echo ""
+            fi
+            if [ "${{ inputs.publish_play_store || inputs.publish_testflight }}" = "true" ]; then
+              echo "| Tienda | Estado |"
+              echo "|---|---|"
+              ${{ inputs.publish_play_store && format('echo "| Google Play ({0}) | {1} |"', inputs.play_track, needs.build-android.outputs.play_store || 'no ejecutado') || '' }}
+              ${{ inputs.publish_testflight && format('echo "| TestFlight | {0} |"', needs.build-ios.outputs.testflight || 'no ejecutado') || '' }}
+              echo ""
+            fi
             echo "Artefactos disponibles en la pestaña **Artifacts** de esta ejecución:"
             echo "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -39,6 +39,13 @@ Al hacer push, se disparan en paralelo:
 - **`notify`** → deja un resumen en la ejecución, opcionalmente notifica a Slack y
   opcionalmente adjunta los artefactos a un GitHub Release.
 
+Con los secrets de firma cargados, cada build además **verifica la firma real**
+de lo que generó (certificado del `.apk`/`.aab` contra tu keystore; certificado,
+team y perfil del `.ipa`) y falla si algo salió sin firmar o con la clave
+equivocada. Y si lo activás, **sube solo a las tiendas**: el `.aab` a Google
+Play y el `.ipa` a TestFlight, al pushear un tag `v*` — ver
+[`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+
 `project_type` decide qué corre: Electron usa `build-electron`, los otros tres
 usan `build-android`/`build-ios` — nunca corren los dos grupos a la vez.
 
@@ -63,7 +70,8 @@ docs/
   REACT-NATIVE.md            # guía específica de React Native
   PWA.md                     # guía específica de PWA (Capacitor)
   ELECTRON.md                # guía específica de Electron
-  SIGNING.md                 # cómo configurar firma de Android/iOS y notificaciones
+  SIGNING.md                 # cómo configurar firma de Android/iOS (y cómo se verifica) y notificaciones
+  PUBLISHING.md              # subida automática a Google Play y TestFlight
   TROUBLESHOOTING.md         # errores frecuentes (reales, ya vistos) y cómo resolverlos
 examples/
   flutter-demo/               # app Flutter mínima usada para probar la plataforma
@@ -103,10 +111,13 @@ de `cli/README.md`.
    [`REACT-NATIVE.md`](docs/REACT-NATIVE.md), [`PWA.md`](docs/PWA.md) o
    [`ELECTRON.md`](docs/ELECTRON.md).
 2. (Opcional) Leé [`docs/SIGNING.md`](docs/SIGNING.md) para builds firmados y
-   notificaciones por Slack.
+   notificaciones por Slack, y [`docs/PUBLISHING.md`](docs/PUBLISHING.md) para
+   publicar en Google Play / TestFlight automáticamente.
 3. Mirá los proyectos de ejemplo, ya configurados para esta plataforma (firma
    opcional de Android incluida) — cada push a su carpeta dispara su propio
    workflow y compila como prueba viva de que el pipeline funciona:
+   Los ejemplos móviles corren con `signing_self_test: true`: firman con un
+   keystore descartable y verifican la firma en cada cambio.
    - [`examples/flutter-demo`](examples/flutter-demo) — Flutter, ver
      `android/app/build.gradle.kts`, disparado por `example-flutter-ci.yml`.
    - [`examples/react-native-demo`](examples/react-native-demo) — React Native, ver

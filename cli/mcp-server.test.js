@@ -103,3 +103,21 @@ test('setup_mobile_ci errors without a detectable type and no explicit project_t
     assert.match(textOf(result), /No pude detectar/);
   });
 });
+
+test('setup_mobile_ci wires store publishing and lists the store secrets', async () => {
+  const dir = tmpProject({ 'pubspec.yaml': 'name: demo\nflutter:\n  sdk: flutter\n' });
+  await withClient(async (client) => {
+    const result = await client.callTool({
+      name: 'setup_mobile_ci',
+      arguments: { cwd: dir, publish_play_store: true, publish_testflight: true },
+    });
+    assert.equal(result.isError, undefined);
+    assert.match(textOf(result), /GOOGLE_PLAY_SERVICE_ACCOUNT_JSON/);
+    assert.match(textOf(result), /APP_STORE_CONNECT_API_KEY_ID/);
+
+    const written = fs.readFileSync(path.join(dir, '.github/workflows/build.yml'), 'utf8');
+    assert.match(written, /publish_play_store:/);
+    assert.match(written, /publish_testflight:/);
+    assert.match(written, /ios_export_method: app-store/);
+  });
+});

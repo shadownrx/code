@@ -110,6 +110,32 @@ Si estos secrets no están configurados, el build de Android simplemente se gene
 sin firma de release (firma debug por defecto de las plantillas de Flutter/RN; sin
 firma en absoluto en la plantilla de Capacitor).
 
+### Verificación automática de la firma
+
+Con los secrets cargados, el workflow ya no se queda con que Gradle terminó bien:
+**comprueba la firma real** de lo que generó.
+
+1. Antes de compilar abre el keystore con `ANDROID_KEYSTORE_PASSWORD` y
+   `ANDROID_KEY_ALIAS`. Si alguno está mal, falla ahí mismo con un mensaje claro
+   (no 5 minutos después, dentro de Gradle).
+2. Después del build revisa cada `.apk` (`apksigner verify`) y cada `.aab`
+   (`jarsigner`) y compara su certificado con el SHA-256 de tu keystore. Si algún
+   archivo sale **sin firmar o firmado con la clave debug**, el build falla.
+
+El caso que esto atrapa es el más traicionero: secrets bien cargados, pero un
+`build.gradle` que nunca lee `key.properties`. Sin esta verificación el build sale
+verde con firma debug y te enterás cuando Play Console rechaza la subida.
+
+Para apagarlo (no recomendado): `verify_signing: false`.
+
+### Probar la firma sin un keystore real (`signing_self_test`)
+
+`signing_self_test: true` genera un keystore descartable en cada run cuando no hay
+`ANDROID_KEYSTORE_BASE64`, así se ejercita todo el camino (`key.properties` →
+Gradle → verificación) sin exponer tu clave real. Es lo que usan los ejemplos de
+este repo en su CI. Esos builds **no sirven para publicar**: la plataforma se
+niega a subirlos a Google Play.
+
 ## iOS
 
 La firma de iOS **requiere una cuenta de Apple Developer** (de pago, ~99 USD/año) —
@@ -137,12 +163,38 @@ Con cuenta de Apple Developer:
    - `IOS_CERTIFICATE_BASE64`
    - `IOS_CERTIFICATE_PASSWORD` (contraseña con la que exportaste el `.p12`)
    - `IOS_PROVISION_PROFILE_BASE64`
-   - `IOS_TEAM_ID` (Team ID de Apple Developer, visible en developer.apple.com/account)
+   - `IOS_TEAM_ID` (**opcional**: el Team ID se lee del perfil; si lo cargás, se
+     usa para confirmar que el perfil es de la cuenta correcta)
+5. Elegí el método de export con el input `ios_export_method`, que tiene que
+   coincidir con el tipo de perfil: `ad-hoc` (default), `app-store`,
+   `development` o `enterprise`. Para subir a TestFlight usá `app-store` (ver
+   [`PUBLISHING.md`](./PUBLISHING.md)).
 
-El workflow importa el certificado y el perfil en un keychain temporal del runner
-macOS, genera un `ExportOptions.plist` (método `ad-hoc` por defecto) y produce un
-`.ipa` firmado. Si necesitás método `app-store` o `enterprise`, ajustá el `method` en
-`.github/workflows/build-mobile.yml` (o pedí que se agregue como input configurable).
+### Qué hace el workflow con eso
+
+1. **Importa** el certificado en un keychain temporal del runner macOS e
+   **instala** el perfil.
+2. **Chequea antes de compilar** (así no gastás 10+ minutos de macOS en un build
+   que iba a fallar al exportar) y corta con un error específico si:
+   - la contraseña del `.p12` es incorrecta,
+   - el perfil está vencido (y avisa si vence en menos de 14 días),
+   - el certificado no está incluido en el perfil (o está vencido/revocado),
+   - el tipo de perfil no coincide con `ios_export_method` (p. ej. perfil App
+     Store con export `ad-hoc`),
+   - `IOS_TEAM_ID` no coincide con el team del perfil.
+3. **Configura firma manual** en el target de la app del `.xcodeproj` (team,
+   identidad y perfil). Solo en ese target, no en los de Pods/SPM, que no
+   aceptan perfiles. Así no dependés de cómo dejaste la firma en Xcode
+   ("Automatically manage signing" no funciona en CI).
+4. Genera `ExportOptions.plist` con firma manual y el mapeo bundle ID → perfil, y
+   produce el `.ipa`.
+5. **Verifica el `.ipa`**: lo abre, corre `codesign --verify` y confirma que el
+   team y el perfil embebido son los que cargaste. Si no coinciden, el build falla
+   (`verify_signing: false` lo apaga).
+
+> **Limitación:** se firma un solo target de app con un solo perfil. Si tu app
+> tiene extensiones (widgets, notification service, etc.), cada una necesita su
+> propio perfil y por ahora no está soportado.
 
 ## Notificaciones
 

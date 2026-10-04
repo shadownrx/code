@@ -7,9 +7,11 @@ import prompts from 'prompts';
 import {
   PROJECT_LABELS,
   androidSecrets,
+  appStoreSecrets,
   buildWorkflowYaml,
   detectProjectType,
   iosSecrets,
+  playStoreSecrets,
 } from './lib.js';
 import {
   banner,
@@ -38,6 +40,8 @@ const HELP_ROWS = [
   ['-t, --type <tipo>', `Tipo: ${PROJECT_TYPES.join('|')}`],
   ['    --target <t>', `Qué compilar: ${TARGETS.join('|')}`],
   ['    --release', 'Adjuntar builds a un GitHub Release en tags v*'],
+  ['    --play-store', 'Subir el .aab a Google Play (internal) en tags v*'],
+  ['    --testflight', 'Subir el .ipa a TestFlight en tags v*'],
   ['    --dry-run', 'Muestra el workflow sin escribir nada'],
   ['-f, --force', 'Sobrescribe build.yml sin preguntar'],
   ['    --cwd <dir>', 'Proyecto a configurar (default: directorio actual)'],
@@ -54,6 +58,8 @@ function parseCli(argv) {
       type: { type: 'string', short: 't' },
       target: { type: 'string' },
       release: { type: 'boolean' },
+      'play-store': { type: 'boolean' },
+      testflight: { type: 'boolean' },
       'dry-run': { type: 'boolean' },
       force: { type: 'boolean', short: 'f' },
       cwd: { type: 'string' },
@@ -85,6 +91,7 @@ function printHelp() {
         `  ${c.cyan('npx shadownrx-code')}                       ${c.gray('# modo interactivo')}`,
         `  ${c.cyan('npx shadownrx-code -y --release')}          ${c.gray('# defaults + releases')}`,
         `  ${c.cyan('npx shadownrx-code -t flutter --dry-run')}  ${c.gray('# solo previsualizar')}`,
+        `  ${c.cyan('npx shadownrx-code -y --play-store --testflight')} ${c.gray('# publicar en tags v*')}`,
       ],
       { title: 'Ayuda', minWidth: PANEL }
     )
@@ -147,7 +154,7 @@ async function main() {
 
   let projectType = opts.type ?? null;
   const willBeElectron = (projectType ?? detected) === 'electron';
-  const totalSteps = willBeElectron ? 2 : 4;
+  const totalSteps = willBeElectron ? 2 : 5;
   let step = 0;
 
   if (!projectType) {
@@ -182,11 +189,13 @@ async function main() {
   }
 
   const isElectron = projectType === 'electron';
-  const steps = isElectron ? 2 : 4;
+  const steps = isElectron ? 2 : 5;
 
   let buildAndroid = true;
   let buildIos = true;
   let wantsSigning = false;
+  let publishPlayStore = false;
+  let publishTestflight = false;
 
   if (isElectron) {
     console.log(`\n  ${sym.info()} Electron compila ${c.bold('Linux, macOS y Windows')} en paralelo ${c.gray('— no hace falta elegir.')}`);
@@ -216,6 +225,26 @@ async function main() {
         initial: false,
       });
     } else step++;
+
+    publishPlayStore = buildAndroid && Boolean(opts['play-store']);
+    publishTestflight = buildIos && Boolean(opts.testflight);
+    if (!opts['play-store'] && !opts.testflight && !auto) {
+      console.log(stepHeader(++step, steps, 'Tiendas'));
+      const choices = [];
+      if (buildAndroid) choices.push({ title: 'Google Play', value: 'play', description: 'sube el .aab al track internal' });
+      if (buildIos) choices.push({ title: 'TestFlight', value: 'testflight', description: 'sube el .ipa a App Store Connect' });
+      const stores = await ask({
+        type: 'multiselect',
+        message: '¿Publicar automáticamente al pushear un tag (v1.2.3)? (espacio para elegir)',
+        choices,
+        instructions: false,
+        hint: 'enter sin elegir = no publicar',
+      });
+      publishPlayStore = stores.includes('play');
+      publishTestflight = stores.includes('testflight');
+    } else step++;
+    // Publishing needs signed builds, so it implies the signing secrets.
+    if (publishPlayStore || publishTestflight) wantsSigning = true;
   }
 
   let createRelease = Boolean(opts.release);
@@ -229,7 +258,15 @@ async function main() {
   }
 
   // ── Resumen ──────────────────────────────────────────────────────────────
-  const config = { projectType, buildAndroid, buildIos, buildElectron: true, createRelease };
+  const config = {
+    projectType,
+    buildAndroid,
+    buildIos,
+    buildElectron: true,
+    createRelease,
+    publishPlayStore,
+    publishTestflight,
+  };
   const yaml = buildWorkflowYaml(config);
   const yes = c.green('sí');
   const no = c.gray('no');
@@ -245,6 +282,7 @@ async function main() {
         ['Proyecto', c.bold(PROJECT_LABELS[projectType] ?? 'Auto-detectar en cada build')],
         ['Plataformas', c.bold(platforms)],
         ['Firma', isElectron ? c.gray('no soportada aún') : wantsSigning ? yes : c.gray('sin firmar (por ahora)')],
+        ['Tiendas', isElectron ? c.gray('no aplica') : [publishPlayStore && 'Google Play', publishTestflight && 'TestFlight'].filter(Boolean).join(' · ') || no],
         ['GitHub Release', createRelease ? yes : no],
       ]),
       { title: 'Resumen', color: c.cyan, minWidth: PANEL }
@@ -298,7 +336,13 @@ async function main() {
     next.push(c.gray('Settings → Secrets and variables → Actions'), '');
     if (buildAndroid) next.push(c.green('Android'), ...androidSecrets().map((s) => `  ${c.gray('☐')} ${s}`));
     if (buildIos) next.push(c.green('iOS'), ...iosSecrets().map((s) => `  ${c.gray('☐')} ${s}`));
-    next.push('', `${c.gray('Guía:')} ${c.underline('https://github.com/shadownrx/code/blob/main/docs/SIGNING.md')}`, '');
+    if (publishPlayStore) next.push(c.green('Google Play'), ...playStoreSecrets().map((s) => `  ${c.gray('☐')} ${s}`));
+    if (publishTestflight) next.push(c.green('TestFlight'), ...appStoreSecrets().map((s) => `  ${c.gray('☐')} ${s}`));
+    next.push('', `${c.gray('Guía:')} ${c.underline('https://github.com/shadownrx/code/blob/main/docs/SIGNING.md')}`);
+    if (publishPlayStore || publishTestflight) {
+      next.push(`${c.gray('Tiendas:')} ${c.underline('https://github.com/shadownrx/code/blob/main/docs/PUBLISHING.md')}`);
+    }
+    next.push('');
   } else {
     next.push(`${sym.info()} Va a compilar ${c.yellow('sin firmar')}: sirve para emulador/simulador.`);
     next.push(`  ${c.gray('Para builds firmados mirá')} ${c.cyan('docs/SIGNING.md')}`, '');
@@ -308,7 +352,9 @@ async function main() {
   next.push(`  ${c.cyan('git add')} ${rel}`);
   next.push(`  ${c.cyan('git commit')} -m ${c.yellow('"ci: build con shadownrx/code"')}`);
   next.push(`  ${c.cyan('git push')}`);
-  if (createRelease) next.push('', `${c.gray('Para un release:')} ${c.cyan('git tag v1.0.0 && git push --tags')}`);
+  if (createRelease || publishPlayStore || publishTestflight) {
+    next.push('', `${c.gray('Para un release:')} ${c.cyan('git tag v1.0.0 && git push --tags')}`);
+  }
 
   console.log(box(next, { title: gradient('Listo'), color: c.green, style: 'round', minWidth: PANEL }));
   console.log();

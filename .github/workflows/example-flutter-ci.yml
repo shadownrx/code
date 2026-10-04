@@ -23,4 +23,8 @@ jobs:
     with:
       project_type: flutter
       working_directory: examples/flutter-demo
+      # No real keystore in this repo: sign with a throwaway one so the
+      # whole signing + verification path is exercised on every change.
+      signing_self_test: true
+      build_number: ${{ github.run_number }}
     secrets: inherit
