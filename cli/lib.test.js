@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildWorkflowYaml, detectProjectType } from './lib.js';
+import { buildWorkflowYaml, detectDefaultBranch, detectProjectType } from './lib.js';
 
 function tmpProject(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shadownrx-code-'));
@@ -86,4 +87,43 @@ test('electron project type emits build_electron instead of build_android/build_
   assert.match(yaml, /build_electron: true/);
   assert.doesNotMatch(yaml, /build_android/);
   assert.doesNotMatch(yaml, /build_ios/);
+});
+
+test('push trigger defaults to main', () => {
+  const yaml = buildWorkflowYaml({ projectType: 'pwa', buildAndroid: true, buildIos: false, createRelease: false });
+  assert.match(yaml, /push:\n\s+branches: \[main\]/);
+});
+
+test('push trigger uses the given branch, quoting names YAML could misread', () => {
+  const master = buildWorkflowYaml({ projectType: 'pwa', buildAndroid: true, buildIos: true, createRelease: false, branch: 'master' });
+  assert.match(master, /branches: \[master\]/);
+
+  const odd = buildWorkflowYaml({ projectType: 'pwa', buildAndroid: true, buildIos: true, createRelease: false, branch: 'dev: #1' });
+  assert.match(odd, /branches: \["dev: #1"\]/);
+});
+
+function git(cwd, ...args) {
+  execFileSync('git', args, { cwd, stdio: 'ignore' });
+}
+
+test('detectDefaultBranch falls back to main outside a git repo', () => {
+  const dir = tmpProject({});
+  assert.equal(detectDefaultBranch(dir), 'main');
+});
+
+test('detectDefaultBranch uses the current branch when there is no origin', () => {
+  const dir = tmpProject({});
+  git(dir, 'init', '-q', '-b', 'master');
+  assert.equal(detectDefaultBranch(dir), 'master');
+});
+
+test("detectDefaultBranch prefers origin's default branch over the current one", () => {
+  const origin = tmpProject({});
+  git(origin, 'init', '-q', '-b', 'trunk');
+  git(origin, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'init');
+
+  const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'shadownrx-code-clone-'));
+  git(clone, 'clone', '-q', origin, '.');
+  git(clone, 'switch', '-q', '-c', 'feature/x');
+  assert.equal(detectDefaultBranch(clone), 'trunk');
 });

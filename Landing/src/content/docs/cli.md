@@ -70,5 +70,6 @@ directamente durante la conversación:
 
 Expone dos tools: `detect_project_type` (solo lectura) y `setup_mobile_ci`
 (escribe el workflow, con los mismos parámetros que el CLI interactivo más
-`overwrite` para confirmar la sobrescritura). Detalle completo en
+`branch` y `overwrite`). El trigger `push` usa la rama por defecto de tu repo
+(`main`, `master`, etc.), detectada con git. Detalle completo en
 [`cli/README.md`](https://github.com/shadownrx/code/blob/main/cli/README.md).

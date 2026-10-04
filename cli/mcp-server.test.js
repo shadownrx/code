@@ -103,3 +103,20 @@ test('setup_mobile_ci errors without a detectable type and no explicit project_t
     assert.match(textOf(result), /No pude detectar/);
   });
 });
+
+test('reports the version from package.json', async () => {
+  const { version } = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+  await withClient(async (client) => {
+    assert.equal(client.getServerVersion().version, version);
+  });
+});
+
+test('setup_mobile_ci honors an explicit branch for the push trigger', async () => {
+  const dir = tmpProject({ 'capacitor.config.json': '{}' });
+  await withClient(async (client) => {
+    const result = await client.callTool({ name: 'setup_mobile_ci', arguments: { cwd: dir, branch: 'develop' } });
+    assert.equal(result.isError, undefined);
+    const written = fs.readFileSync(path.join(dir, '.github/workflows/build.yml'), 'utf8');
+    assert.match(written, /push:\n\s+branches: \[develop\]/);
+  });
+});

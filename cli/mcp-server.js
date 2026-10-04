@@ -11,11 +11,13 @@ import {
   PROJECT_LABELS,
   androidSecrets,
   buildWorkflowYaml,
+  detectDefaultBranch,
   detectProjectType,
   iosSecrets,
 } from './lib.js';
 
-const server = new McpServer({ name: 'shadownrx-code', version: '1.0.0' });
+const { version } = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+const server = new McpServer({ name: 'shadownrx-code', version });
 
 const PROJECT_TYPES = ['auto', 'flutter', 'react-native', 'pwa', 'electron'];
 
@@ -67,10 +69,14 @@ server.registerTool(
       build_ios: z.boolean().optional().describe('Only relevant for flutter/react-native/pwa. Default true.'),
       build_electron: z.boolean().optional().describe('Only relevant for project_type electron. Default true.'),
       create_release: z.boolean().optional().describe('Attach build artifacts to a GitHub Release on tag pushes. Default false.'),
+      branch: z
+        .string()
+        .optional()
+        .describe("Branch whose pushes trigger a build. Defaults to the repo's default branch (origin/HEAD), else the current branch."),
       overwrite: z.boolean().optional().describe('Overwrite an existing .github/workflows/build.yml. Default false.'),
     },
   },
-  async ({ cwd, project_type, build_android, build_ios, build_electron, create_release, overwrite }) => {
+  async ({ cwd, project_type, build_android, build_ios, build_electron, create_release, branch, overwrite }) => {
     const dir = cwd ? path.resolve(cwd) : process.cwd();
     if (!fs.existsSync(dir)) {
       return { ...text(`No existe el directorio: ${dir}`), isError: true };
@@ -98,6 +104,7 @@ server.registerTool(
       buildIos: build_ios ?? true,
       buildElectron: build_electron ?? true,
       createRelease: create_release ?? false,
+      branch: branch ?? detectDefaultBranch(dir),
     });
 
     const workflowPath = path.join(dir, '.github', 'workflows', 'build.yml');
