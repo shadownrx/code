@@ -10,6 +10,7 @@
   "files": [
     "bin.js",
     "lib.js",
+    "ui.js",
     "mcp-server.js"
   ],
   "scripts": {
