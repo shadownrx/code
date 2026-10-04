@@ -6,6 +6,7 @@ import {
   PROJECT_LABELS,
   androidSecrets,
   buildWorkflowYaml,
+  detectDefaultBranch,
   detectProjectType,
   iosSecrets,
 } from './lib.js';
@@ -128,6 +129,7 @@ async function main() {
     buildIos,
     buildElectron,
     createRelease: wantsRelease,
+    branch: detectDefaultBranch(cwd),
   });
 
   fs.mkdirSync(path.dirname(workflowPath), { recursive: true });
