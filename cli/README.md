@@ -11,14 +11,47 @@ forma local: únicamente prepara el workflow que se ejecuta en GitHub
 Actions.
 
 ```
-▲ shadownrx/code — configurador de CI para Android, iOS y Electron
+  ███████╗██╗  ██╗ █████╗ ██████╗  ██████╗ ██╗    ██╗███╗   ██╗██████╗ ██╗  ██╗
+  ...
+  /code · CI gratis para Android, iOS y Electron · v2.0.1
 
-? Detecté un proyecto React Native en este directorio. ¿Es correcto? › Yes
-? ¿Qué deseas compilar? › Android + iOS (ambas)
-? ¿Ya tenés listos los secrets de firma (keystore / certificado de Apple)? › No
-? ¿Adjuntar los builds a un GitHub Release cuando pushees un tag (v1.2.3)? › No
+  ✔ Proyecto detectado: React Native
 
-✔ Escribí .github/workflows/build.yml
+  ━━━━━━━━━━━━──────────── Paso 3/4 · Firma
+✔ ¿Ya tenés listos los secrets de firma (keystore / certificado de Apple)? … yes
+
+  ╭─ Pipeline en GitHub Actions ───────────────────────────────────────────╮
+  │ ◉   git push                       main · PR · tags v* · manual        │
+  │ │                                                                      │
+  │ ◆   detect              [ubuntu]   project_type: react-native          │
+  │ │                                                                      │
+  │ ├─▶ build-android       [ubuntu]   → .apk  .aab                        │
+  │ ├─▶ build-ios           [macos]    → .ipa                              │
+  │ │                                                                      │
+  │ ◆   notify              [ubuntu]   resumen · Slack opcional            │
+  ╰────────────────────────────────────────────────────────────────────────╯
+```
+
+Antes de escribir muestra un resumen, el pipeline que va a correr en GitHub
+Actions y una vista previa del YAML con resaltado de sintaxis. Respeta
+`NO_COLOR`, y si la terminal es angosta usa un encabezado compacto.
+
+### Opciones
+
+| Flag | Qué hace |
+|---|---|
+| `-y`, `--yes` | Sin preguntas: usa el tipo detectado (o `auto`) y los valores por defecto |
+| `-t`, `--type <tipo>` | Fija el tipo: `flutter`, `react-native`, `pwa`, `electron` o `auto` |
+| `--target <t>` | Qué compilar (no Electron): `both`, `android` o `ios` |
+| `--release` | Adjunta los builds a un GitHub Release en tags `v*` |
+| `--dry-run` | Muestra el workflow sin escribir nada |
+| `-f`, `--force` | Sobrescribe `build.yml` sin preguntar |
+| `--cwd <dir>` | Proyecto a configurar (por defecto, el directorio actual) |
+| `--no-color` | Desactiva los colores |
+
+```bash
+npx shadownrx-code -y --release            # CI sin preguntas, con releases
+npx shadownrx-code -t flutter --dry-run    # solo previsualizar
 ```
 
 Para proyectos Electron las preguntas de plataforma de compilación y de
@@ -152,10 +185,11 @@ de sobrescribirlo.
 
 La lógica pura (detección de proyecto y generación del YAML) vive en
 `lib.js`, separada de `bin.js` (la interfaz interactiva, con
-[`prompts`](https://www.npmjs.com/package/prompts)) y de `mcp-server.js`
+[`prompts`](https://www.npmjs.com/package/prompts)), de `ui.js` (banner,
+paneles, spinner y diagrama en ANSI puro, sin dependencias) y de `mcp-server.js`
 (el servidor MCP). Esta separación evita duplicar lógica y permite testear
 sin simular una terminal ni un cliente MCP real:
 
 ```bash
-npm test   # node --test — corre lib.test.js y mcp-server.test.js
+npm test   # node --test — corre lib.test.js, ui.test.js y mcp-server.test.js
 ```

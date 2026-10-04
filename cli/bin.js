@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { parseArgs } from 'node:util';
 import prompts from 'prompts';
 import {
   PROJECT_LABELS,
@@ -9,151 +11,307 @@ import {
   detectProjectType,
   iosSecrets,
 } from './lib.js';
+import {
+  banner,
+  box,
+  c,
+  gradient,
+  highlightYaml,
+  pipeline,
+  rule,
+  setColor,
+  spin,
+  stepHeader,
+  sym,
+  table,
+} from './ui.js';
 
-const cwd = process.cwd();
+const pkg = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+const TAGLINE = 'CI gratis para Android, iOS y Electron';
+const PROJECT_TYPES = ['flutter', 'react-native', 'pwa', 'electron', 'auto'];
+const TARGETS = ['both', 'android', 'ios'];
+// Inner width shared by every panel so their right edges line up.
+const PANEL = 72;
+
+const HELP_ROWS = [
+  ['-y, --yes', 'Sin preguntas: usa lo detectado y los defaults'],
+  ['-t, --type <tipo>', `Tipo: ${PROJECT_TYPES.join('|')}`],
+  ['    --target <t>', `Qué compilar: ${TARGETS.join('|')}`],
+  ['    --release', 'Adjuntar builds a un GitHub Release en tags v*'],
+  ['    --dry-run', 'Muestra el workflow sin escribir nada'],
+  ['-f, --force', 'Sobrescribe build.yml sin preguntar'],
+  ['    --cwd <dir>', 'Proyecto a configurar (default: directorio actual)'],
+  ['    --no-color', 'Desactiva colores (también respeta NO_COLOR)'],
+  ['-v, --version', 'Muestra la versión'],
+  ['-h, --help', 'Muestra esta ayuda'],
+];
+
+function parseCli(argv) {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      yes: { type: 'boolean', short: 'y' },
+      type: { type: 'string', short: 't' },
+      target: { type: 'string' },
+      release: { type: 'boolean' },
+      'dry-run': { type: 'boolean' },
+      force: { type: 'boolean', short: 'f' },
+      cwd: { type: 'string' },
+      'no-color': { type: 'boolean' },
+      version: { type: 'boolean', short: 'v' },
+      help: { type: 'boolean', short: 'h' },
+    },
+    strict: true,
+  });
+  if (values.type && !PROJECT_TYPES.includes(values.type)) {
+    throw new Error(`--type inválido: "${values.type}". Opciones: ${PROJECT_TYPES.join(', ')}`);
+  }
+  if (values.target && !TARGETS.includes(values.target)) {
+    throw new Error(`--target inválido: "${values.target}". Opciones: ${TARGETS.join(', ')}`);
+  }
+  return values;
+}
+
+function printHelp() {
+  console.log(banner({ version: pkg.version, tagline: TAGLINE }));
+  console.log(
+    box(
+      [
+        `${c.bold('Uso:')} ${c.cyan('npx shadownrx-code')} ${c.gray('[opciones]')}`,
+        '',
+        ...table(HELP_ROWS, { keyColor: c.cyan }),
+        '',
+        c.gray('Ejemplos:'),
+        `  ${c.cyan('npx shadownrx-code')}                       ${c.gray('# modo interactivo')}`,
+        `  ${c.cyan('npx shadownrx-code -y --release')}          ${c.gray('# defaults + releases')}`,
+        `  ${c.cyan('npx shadownrx-code -t flutter --dry-run')}  ${c.gray('# solo previsualizar')}`,
+      ],
+      { title: 'Ayuda', minWidth: PANEL }
+    )
+  );
+  console.log();
+}
+
+function displayPath(p) {
+  const home = os.homedir();
+  const short = p.startsWith(home) ? '~' + p.slice(home.length) : p;
+  return short.length > PANEL - 12 ? '…' + short.slice(-(PANEL - 13)) : short;
+}
 
 function onCancel() {
-  console.log('\nCancelado — no se modificó nada.\n');
+  console.log(`\n  ${sym.fail()} ${c.bold('Cancelado')} ${c.gray('— no se modificó nada.')}\n`);
   process.exit(1);
 }
 
+async function ask(question) {
+  return prompts({ name: 'value', ...question }, { onCancel }).then((r) => r.value);
+}
+
 async function main() {
-  console.log('\n▲ shadownrx/code — configurador de CI para Android, iOS y Electron\n');
-  console.log('Esto escribe .github/workflows/build.yml en este proyecto. No compila nada');
-  console.log('acá: el build corre gratis en GitHub Actions con cada push.\n');
+  let opts;
+  try {
+    opts = parseCli(process.argv.slice(2));
+  } catch (err) {
+    console.error(`\n  ${sym.fail()} ${err.message}\n  ${c.gray('Probá')} ${c.cyan('--help')}\n`);
+    process.exit(2);
+  }
+  if (opts['no-color']) setColor(false);
+  if (opts.version) return console.log(pkg.version);
+  if (opts.help) return printHelp();
 
-  const detected = detectProjectType(cwd);
-  let projectType = detected;
+  const cwd = path.resolve(opts.cwd ?? process.cwd());
+  const auto = Boolean(opts.yes);
 
+  console.log(banner({ version: pkg.version, tagline: TAGLINE }));
+  console.log(
+    box(
+      [
+        `Genera ${c.cyan('.github/workflows/build.yml')} para este proyecto.`,
+        `No compila nada acá: el build corre ${c.green('gratis')} en GitHub Actions`,
+        `con cada push — sin Mac ni Windows en tu máquina.`,
+        '',
+        `${c.gray('Proyecto:')} ${c.bold(displayPath(cwd))}`,
+      ],
+      { title: gradient('Configurador de CI'), minWidth: PANEL }
+    )
+  );
+
+  // ── Detección ────────────────────────────────────────────────────────────
+  console.log();
+  const detected = await spin('Analizando el proyecto…', () => detectProjectType(cwd));
   if (detected) {
-    const { confirmDetected } = await prompts(
-      {
-        type: 'confirm',
-        name: 'confirmDetected',
-        message: `Detecté un proyecto ${PROJECT_LABELS[detected]} en este directorio. ¿Es correcto?`,
-        initial: true,
-      },
-      { onCancel }
-    );
-    if (!confirmDetected) projectType = null;
+    console.log(`  ${sym.ok()} Proyecto detectado: ${c.bold(PROJECT_LABELS[detected])}`);
+  } else {
+    console.log(`  ${sym.warn()} ${c.yellow('No pude detectar el tipo de proyecto')} ${c.gray('(Flutter / RN / PWA / Electron)')}`);
   }
 
+  let projectType = opts.type ?? null;
+  const willBeElectron = (projectType ?? detected) === 'electron';
+  const totalSteps = willBeElectron ? 2 : 4;
+  let step = 0;
+
   if (!projectType) {
-    const { picked } = await prompts(
-      {
-        type: 'select',
-        name: 'picked',
-        message: '¿Qué tipo de proyecto es?',
-        choices: [
-          { title: 'Flutter', value: 'flutter' },
-          { title: 'React Native', value: 'react-native' },
-          { title: 'PWA (Capacitor)', value: 'pwa' },
-          { title: 'Electron', value: 'electron' },
-          { title: 'Detectar automáticamente en cada build', value: 'auto' },
-        ],
-      },
-      { onCancel }
-    );
-    projectType = picked;
+    if (auto) {
+      projectType = detected ?? 'auto';
+    } else {
+      console.log(stepHeader(++step, totalSteps, 'Tipo de proyecto'));
+      if (detected) {
+        const ok = await ask({
+          type: 'confirm',
+          message: `¿Es un proyecto ${PROJECT_LABELS[detected]}?`,
+          initial: true,
+        });
+        if (ok) projectType = detected;
+      }
+      if (!projectType) {
+        projectType = await ask({
+          type: 'select',
+          message: '¿Qué tipo de proyecto es?',
+          choices: [
+            { title: 'Flutter', value: 'flutter', description: 'pubspec.yaml' },
+            { title: 'React Native', value: 'react-native', description: 'react-native en package.json' },
+            { title: 'PWA (Capacitor)', value: 'pwa', description: 'capacitor.config.*' },
+            { title: 'Electron', value: 'electron', description: 'escritorio: Linux, macOS, Windows' },
+            { title: 'Detectar en cada build', value: 'auto', description: 'project_type: auto' },
+          ],
+        });
+      }
+    }
+  } else {
+    step++;
   }
 
   const isElectron = projectType === 'electron';
+  const steps = isElectron ? 2 : 4;
 
   let buildAndroid = true;
   let buildIos = true;
-  let buildElectron = true;
   let wantsSigning = false;
 
   if (isElectron) {
-    console.log('\nElectron compila Linux, macOS y Windows en paralelo — no hace falta elegir.\n');
+    console.log(`\n  ${sym.info()} Electron compila ${c.bold('Linux, macOS y Windows')} en paralelo ${c.gray('— no hace falta elegir.')}`);
   } else {
-    const { target } = await prompts(
-      {
+    let target = opts.target;
+    if (!target && !auto) {
+      console.log(stepHeader(++step, steps, 'Plataformas'));
+      target = await ask({
         type: 'select',
-        name: 'target',
         message: '¿Qué deseas compilar?',
         choices: [
-          { title: 'Android + iOS (ambas)', value: 'both' },
-          { title: 'Solo Android', value: 'android' },
-          { title: 'Solo iOS', value: 'ios' },
+          { title: 'Android + iOS', value: 'both', description: '.apk/.aab + .ipa' },
+          { title: 'Solo Android', value: 'android', description: '.apk/.aab en runner Linux' },
+          { title: 'Solo iOS', value: 'ios', description: '.ipa en runner macOS' },
         ],
-      },
-      { onCancel }
-    );
+      });
+    } else step++;
+    target ??= 'both';
     buildAndroid = target !== 'ios';
     buildIos = target !== 'android';
 
-    const signingAnswer = await prompts(
-      {
+    if (!auto) {
+      console.log(stepHeader(++step, steps, 'Firma'));
+      wantsSigning = await ask({
         type: 'confirm',
-        name: 'wantsSigning',
         message: '¿Ya tenés listos los secrets de firma (keystore / certificado de Apple)?',
         initial: false,
-      },
-      { onCancel }
-    );
-    wantsSigning = signingAnswer.wantsSigning;
+      });
+    } else step++;
   }
 
-  const { wantsRelease } = await prompts(
-    {
+  let createRelease = Boolean(opts.release);
+  if (!opts.release && !auto) {
+    console.log(stepHeader(++step, steps, 'Releases'));
+    createRelease = await ask({
       type: 'confirm',
-      name: 'wantsRelease',
-      message: '¿Adjuntar los builds a un GitHub Release cuando pushees un tag (v1.2.3)?',
+      message: '¿Adjuntar los builds a un GitHub Release al pushear un tag (v1.2.3)?',
       initial: false,
-    },
-    { onCancel }
-  );
+    });
+  }
 
+  // ── Resumen ──────────────────────────────────────────────────────────────
+  const config = { projectType, buildAndroid, buildIos, buildElectron: true, createRelease };
+  const yaml = buildWorkflowYaml(config);
+  const yes = c.green('sí');
+  const no = c.gray('no');
+
+  const platforms = isElectron
+    ? 'Linux · macOS · Windows'
+    : [buildAndroid && 'Android', buildIos && 'iOS'].filter(Boolean).join(' · ');
+
+  console.log(`\n  ${gradient('━'.repeat(PANEL + 2))}\n`);
+  console.log(
+    box(
+      table([
+        ['Proyecto', c.bold(PROJECT_LABELS[projectType] ?? 'Auto-detectar en cada build')],
+        ['Plataformas', c.bold(platforms)],
+        ['Firma', isElectron ? c.gray('no soportada aún') : wantsSigning ? yes : c.gray('sin firmar (por ahora)')],
+        ['GitHub Release', createRelease ? yes : no],
+      ]),
+      { title: 'Resumen', color: c.cyan, minWidth: PANEL }
+    )
+  );
+  console.log();
+  console.log(box(pipeline(config), { title: 'Pipeline en GitHub Actions', color: c.magenta, minWidth: PANEL }));
+  console.log();
+  console.log(box(highlightYaml(yaml), { title: '.github/workflows/build.yml', color: c.blue, minWidth: PANEL }));
+  console.log();
+
+  if (opts['dry-run']) {
+    console.log(`  ${sym.info()} ${c.bold('--dry-run')}: no se escribió nada.\n`);
+    return;
+  }
+
+  // ── Escritura ────────────────────────────────────────────────────────────
   const workflowPath = path.join(cwd, '.github', 'workflows', 'build.yml');
-  if (fs.existsSync(workflowPath)) {
-    const { overwrite } = await prompts(
-      {
-        type: 'confirm',
-        name: 'overwrite',
-        message: `Ya existe ${path.relative(cwd, workflowPath)}. ¿Sobrescribir?`,
-        initial: false,
-      },
-      { onCancel }
-    );
-    if (!overwrite) {
-      console.log('\nCancelado — no se modificó nada.\n');
+  const rel = path.relative(cwd, workflowPath);
+
+  if (!auto) {
+    const go = await ask({ type: 'confirm', message: `¿Escribir ${rel}?`, initial: true });
+    if (!go) onCancel();
+  }
+
+  if (fs.existsSync(workflowPath) && !opts.force) {
+    if (fs.readFileSync(workflowPath, 'utf8') === yaml) {
+      console.log(`  ${sym.ok()} ${rel} ya está al día ${c.gray('— nada que cambiar.')}\n`);
       return;
     }
+    if (auto) {
+      console.log(`  ${sym.warn()} ${c.yellow(`Ya existe ${rel}.`)} Usá ${c.cyan('--force')} para sobrescribirlo.\n`);
+      process.exit(1);
+    }
+    const overwrite = await ask({ type: 'confirm', message: `Ya existe ${rel}. ¿Sobrescribir?`, initial: false });
+    if (!overwrite) onCancel();
   }
 
-  const yaml = buildWorkflowYaml({
-    projectType,
-    buildAndroid,
-    buildIos,
-    buildElectron,
-    createRelease: wantsRelease,
-  });
+  await spin(`Escribiendo ${rel}…`, () => {
+    fs.mkdirSync(path.dirname(workflowPath), { recursive: true });
+    fs.writeFileSync(workflowPath, yaml);
+  }, { minMs: 300 });
 
-  fs.mkdirSync(path.dirname(workflowPath), { recursive: true });
-  fs.writeFileSync(workflowPath, yaml);
-
-  console.log(`\n✔ Escribí ${path.relative(cwd, workflowPath)}\n`);
+  // ── Próximos pasos ───────────────────────────────────────────────────────
+  const next = [`${sym.ok()} ${c.bold(`Escribí ${rel}`)}`, ''];
 
   if (isElectron) {
-    console.log(
-      'Los builds de Electron salen sin firmar por ahora (la firma de macOS/Windows\n' +
-        'todavía no está soportada por la plataforma).\n'
-    );
+    next.push(`${sym.warn()} Los builds de Electron salen ${c.yellow('sin firmar')} por ahora.`, '');
   } else if (wantsSigning) {
-    console.log('Agregá estos secrets en GitHub (Settings → Secrets and variables → Actions):\n');
-    if (buildAndroid) console.log(`  Android: ${androidSecrets().join(', ')}`);
-    if (buildIos) console.log(`  iOS:     ${iosSecrets().join(', ')}`);
-    console.log('\nDetalle paso a paso: https://github.com/shadownrx/code/blob/main/docs/SIGNING.md\n');
+    next.push(c.bold('Cargá estos secrets en GitHub:'));
+    next.push(c.gray('Settings → Secrets and variables → Actions'), '');
+    if (buildAndroid) next.push(c.green('Android'), ...androidSecrets().map((s) => `  ${c.gray('☐')} ${s}`));
+    if (buildIos) next.push(c.green('iOS'), ...iosSecrets().map((s) => `  ${c.gray('☐')} ${s}`));
+    next.push('', `${c.gray('Guía:')} ${c.underline('https://github.com/shadownrx/code/blob/main/docs/SIGNING.md')}`, '');
   } else {
-    console.log(
-      'Por ahora va a compilar sin firmar (sirve para probar que compila y correr en\n' +
-        'simulador/emulador). Cuando quieras builds firmados, mirá docs/SIGNING.md.\n'
-    );
+    next.push(`${sym.info()} Va a compilar ${c.yellow('sin firmar')}: sirve para emulador/simulador.`);
+    next.push(`  ${c.gray('Para builds firmados mirá')} ${c.cyan('docs/SIGNING.md')}`, '');
   }
 
-  console.log('Siguiente paso: hacé commit y push — el primer build corre solo, gratis,');
-  console.log('sin necesitar Mac (ni Windows, si es Electron) en tu máquina.\n');
+  next.push(rule(c.bold('Siguiente paso'), PANEL - 2).trimStart(), '');
+  next.push(`  ${c.cyan('git add')} ${rel}`);
+  next.push(`  ${c.cyan('git commit')} -m ${c.yellow('"ci: build con shadownrx/code"')}`);
+  next.push(`  ${c.cyan('git push')}`);
+  if (createRelease) next.push('', `${c.gray('Para un release:')} ${c.cyan('git tag v1.0.0 && git push --tags')}`);
+
+  console.log(box(next, { title: gradient('Listo'), color: c.green, style: 'round', minWidth: PANEL }));
+  console.log();
 }
 
 main();
