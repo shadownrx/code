@@ -15,7 +15,7 @@ export async function getSidebar(): Promise<NavSection[]> {
   const guides = docs
     .filter((d) => d.data.section === 'Guías')
     .sort((a, b) => a.data.order - b.data.order)
-    .map((d) => ({ title: d.data.title, href: `/docs/${d.slug}` }));
+    .map((d) => ({ title: d.data.title, href: `/docs/${d.id}` }));
 
   return [
     { section: 'Empezar', items: [{ title: 'Introducción', href: '/' }] },
