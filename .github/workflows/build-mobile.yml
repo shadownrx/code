@@ -345,7 +345,7 @@ jobs:
           EXPECTED: ${{ steps.keystore.outputs.sha256 }}
         run: |
           shopt -s nullglob
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          BT=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           HINT="tu android/app/build.gradle no está usando android/key.properties para el buildType release — ver docs/SIGNING.md"
           fail=0
           checked=0
@@ -433,8 +433,8 @@ jobs:
           fi
 
           if [ -z "$PACKAGE_NAME" ]; then
-            BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
-            apk=$(ls android-artifacts/*.apk | head -1)
+            BT=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+            apk=$(find android-artifacts -maxdepth 1 -name '*.apk' | sort | head -1)
             PACKAGE_NAME=$("$BT/aapt2" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
           fi
           if [ -z "$PACKAGE_NAME" ]; then
@@ -496,6 +496,8 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           # Prepend to the search list (not just default-keychain) so
           # codesign and xcodebuild both find the identity.
+          # Word splitting is intended: one argument per existing keychain.
+          # shellcheck disable=SC2046
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           security default-keychain -s "$KEYCHAIN"
 
@@ -513,7 +515,8 @@ jobs:
             exit 1
           fi
 
-          export IDENTITIES="$(security find-identity -v -p codesigning "$KEYCHAIN")"
+          IDENTITIES="$(security find-identity -v -p codesigning "$KEYCHAIN")"
+          export IDENTITIES
           echo "$IDENTITIES"
           python3 - "$RUNNER_TEMP/profile.mobileprovision" "$RUNNER_TEMP/profile.plist" <<'PY'
           import datetime, hashlib, os, plistlib, re, shutil, sys
@@ -822,7 +825,7 @@ jobs:
           for ipa in "${ipas[@]}"; do
             tmp=$(mktemp -d)
             unzip -q "$ipa" -d "$tmp"
-            app=$(ls -d "$tmp"/Payload/*.app | head -1)
+            app=$(find "$tmp/Payload" -mindepth 1 -maxdepth 1 -type d -name '*.app' | head -1)
             if ! codesign --verify --deep --strict "$app" 2>&1; then
               echo "::error::$ipa: la firma de la app no es válida (codesign --verify)."
               fail=1
@@ -871,7 +874,7 @@ jobs:
             exit 1
           fi
 
-          ipa=$(ls ios-artifacts/*.ipa | head -1)
+          ipa=$(find ios-artifacts -maxdepth 1 -name '*.ipa' | sort | head -1)
           # altool looks the key up by ID in this directory.
           mkdir -p ~/.appstoreconnect/private_keys
           KEY_FILE=~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
