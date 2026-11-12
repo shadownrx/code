@@ -8,6 +8,11 @@ order: 5
 Esta lista incluye errores **reales** que aparecieron mientras se armaba y probaba
 esta plataforma — no casos teóricos.
 
+> Antes de buscar acá: [`npx shadownrx-code doctor`](/docs/cli) detecta en
+> segundos varios de estos errores sin gastar minutos de CI (`project_type`
+> equivocado, `build.gradle` que no lee `key.properties` o `-PversionCode`,
+> secrets faltantes o a medio cargar), y sugiere el arreglo.
+
 ## "Unrecognized named-value: 'secrets'"
 
 **Síntoma:** la ejecución falla instantáneamente, con 0 jobs, apenas hacés push.

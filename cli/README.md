@@ -204,23 +204,31 @@ El trigger `push` del workflow generado usa la rama por defecto del repo
 Para proyectos Electron, en lugar de `build_android`/`build_ios` se emite
 `build_electron: true` (siempre compila para los tres sistemas operativos).
 
-Si se indica que los secrets de firma ya están configurados, se listan los
-nombres exactos que deben cargarse en GitHub y se referencia
-`docs/SIGNING.md`. El CLI no solicita ni manipula esos secrets: siempre se
-configuran manualmente como GitHub Secrets.
+Si vas a firmar o publicar, al final se listan los nombres exactos de los
+secrets y, si `gh` está disponible, se marca cuáles ya existen en el repo. El
+configurador nunca pide valores de secrets: eso lo hace solo el comando
+`secrets`, que los valida en tu máquina y los sube con `gh secret set`
+(también podés cargarlos a mano siguiendo `docs/SIGNING.md`).
 
-Si `.github/workflows/build.yml` ya existe, se solicita confirmación antes
-de sobrescribirlo.
+Si `.github/workflows/build.yml` ya existe, se muestra un diff contra el
+archivo actual y se pide confirmar antes de sobrescribirlo.
 
 ## Desarrollo
 
 La lógica pura (detección de proyecto y generación del YAML) vive en
-`lib.js`, separada de `bin.js` (la interfaz interactiva, con
+`lib.js`, separada de `checks.js` (los chequeos de `doctor` y los validadores
+de `secrets`, con `gh`/`keytool`/`openssl` inyectables para testear), de
+`bin.js` (la interfaz interactiva, con
 [`prompts`](https://www.npmjs.com/package/prompts)), de `ui.js` (banner,
-paneles, spinner y diagrama en ANSI puro, sin dependencias) y de `mcp-server.js`
-(el servidor MCP). Esta separación evita duplicar lógica y permite testear
-sin simular una terminal ni un cliente MCP real:
+paneles, spinner, diff y diagrama en ANSI puro, sin dependencias) y de
+`mcp-server.js` (el servidor MCP). Esta separación evita duplicar lógica y
+permite testear sin simular una terminal ni un cliente MCP real:
 
 ```bash
-npm test   # node --test — corre lib.test.js, ui.test.js y mcp-server.test.js
+npm test   # node --test — corre todos los *.test.js
 ```
+
+`workflow.test.js` ejecuta el bash real de `build-mobile.yml` (detección y
+preparación del keystore), así el workflow y el CLI no se desalinean. El CI
+(`.github/workflows/cli-ci.yml`) corre los tests en Node 18 y 24, más
+actionlint con shellcheck.

@@ -14,6 +14,11 @@ Requisito previo: la **firma real** ya configurada ([Firma de apps](/docs/signin
 Las tiendas solo aceptan builds firmados, así que el workflow se niega a publicar
 sin firma (y tampoco publica con `signing_self_test`).
 
+> Atajo: [`npx shadownrx-code secrets`](/docs/cli) también valida y sube el
+> JSON de Google Play y la key `.p8` de App Store Connect. Antes del primer
+> tag, corré `npx shadownrx-code doctor`: avisa si `build.gradle` ignora
+> `-PversionCode` o si falta algún secret de tiendas.
+
 ## Workflow de ejemplo
 
 ```yaml

@@ -79,8 +79,10 @@ examples/
   pwa-demo/                   # PWA mínima empaquetada con Capacitor, usada para probar la plataforma
   electron-demo/              # app Electron mínima usada para probar la plataforma
 cli/
-  bin.js                      # configurador interactivo de terminal — ver cli/README.md
-  mcp-server.js                # lo mismo, como tool MCP para Cursor/Claude Code/etc.
+  bin.js                      # CLI: configurador, `doctor` y `secrets` — ver cli/README.md
+  checks.js                   # chequeos de `doctor` y validadores de `secrets`
+  mcp-server.js                # el configurador, como tool MCP para Cursor/Claude Code/etc.
+  CHANGELOG.md                 # novedades por versión del paquete npm
 .cursor/
   mcp.json                     # este repo ya trae la tool de Cursor precargada
 Landing/                       # sitio de docs/landing en Astro (vercel.com/docs-like)
@@ -95,6 +97,15 @@ publicado en npm. Ejecutando `npx shadownrx-code` en la raíz del proyecto
 configuración necesarias y se escribe `.github/workflows/build.yml` listo
 para usar. Ver [`cli/README.md`](cli/README.md) para el detalle de
 instalación y uso.
+
+```bash
+npx shadownrx-code           # genera .github/workflows/build.yml
+npx shadownrx-code secrets   # valida keystore/certificados y los sube a GitHub
+npx shadownrx-code doctor    # chequea proyecto, Gradle y secrets antes de pushear
+```
+
+`secrets` y `doctor` usan [GitHub CLI](https://cli.github.com) (`gh auth
+login`). Novedades de cada versión en [`cli/CHANGELOG.md`](cli/CHANGELOG.md).
 
 **Opción tool de editor — Cursor / cualquier cliente MCP:** la misma
 funcionalidad, expuesta como una tool que el agente invoca directamente
@@ -127,7 +138,8 @@ de `cli/README.md`.
    - [`examples/electron-demo`](examples/electron-demo) — Electron, compila
      `.AppImage`/`.dmg`/`.exe` en Linux+macOS+Windows, disparado por
      `example-electron-ci.yml`.
-4. Si algo falla, mirá [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — reúne
+4. Si algo falla, corré `npx shadownrx-code doctor` y mirá
+   [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — reúne
    los errores que ya aparecieron armando esta plataforma (y cómo se resolvieron),
    no solo casos teóricos.
 
