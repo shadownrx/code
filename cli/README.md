@@ -13,7 +13,7 @@ Actions.
 ```
   ███████╗██╗  ██╗ █████╗ ██████╗  ██████╗ ██╗    ██╗███╗   ██╗██████╗ ██╗  ██╗
   ...
-  /code · CI gratis para Android, iOS y Electron · v2.2.0
+  /code · CI gratis para Android, iOS y Electron · v7.5.2
 
   ✔ Proyecto detectado: React Native
 
@@ -33,8 +33,30 @@ Actions.
 ```
 
 Antes de escribir muestra un resumen, el pipeline que va a correr en GitHub
-Actions y una vista previa del YAML con resaltado de sintaxis. Respeta
-`NO_COLOR`, y si la terminal es angosta usa un encabezado compacto.
+Actions y una vista previa del YAML con resaltado de sintaxis. Si
+`build.yml` ya existe, en lugar del YAML completo muestra un **diff** contra
+el archivo actual y pide confirmar los cambios. Al terminar consulta los
+secrets del repo con `gh` y marca cuáles ya están cargados (☑) y cuáles
+faltan (☐). Respeta `NO_COLOR`, y si la terminal es angosta usa un
+encabezado compacto.
+
+### Comandos
+
+| Comando | Qué hace |
+|---|---|
+| *(ninguno)* / `init` | Genera `.github/workflows/build.yml` (el configurador de arriba) |
+| `doctor` | Revisa el proyecto antes de gastar minutos de CI: tipo detectado vs. `project_type`, que `android/app/build.gradle` lea `key.properties` y `-PversionCode`, y qué secrets faltan en GitHub según lo que vas a firmar o publicar. Sale con código 1 si hay errores. |
+| `secrets` | Pide el keystore, el `.p12` + perfil, el JSON de Google Play y la key `.p8`; **los valida localmente** (keytool, openssl, vencimiento y tipo del perfil) y los sube con `gh secret set`. Los valores viajan por stdin, nunca en argv. Con `--dry-run` solo valida. |
+
+```bash
+npx shadownrx-code doctor          # ✔/▲/✖ por chequeo, con el arreglo sugerido
+npx shadownrx-code doctor --json   # mismo resultado para CI o agentes
+npx shadownrx-code secrets         # cargar la firma en el repo sin base64 a mano
+```
+
+`doctor` y `secrets` usan [GitHub CLI](https://cli.github.com) (`gh auth
+login`) para leer y escribir los secrets del repo del directorio actual. Sin
+`gh`, `doctor` igual corre los chequeos locales.
 
 ### Opciones
 
@@ -46,8 +68,9 @@ Actions y una vista previa del YAML con resaltado de sintaxis. Respeta
 | `--release` | Adjunta los builds a un GitHub Release en tags `v*` |
 | `--play-store` | Sube el `.aab` firmado a Google Play (track `internal`) en tags `v*` |
 | `--testflight` | Sube el `.ipa` firmado a TestFlight en tags `v*` |
-| `--dry-run` | Muestra el workflow sin escribir nada |
+| `--dry-run` | Muestra el workflow (o, en `secrets`, valida) sin escribir nada |
 | `-f`, `--force` | Sobrescribe `build.yml` sin preguntar |
+| `--json` | Salida JSON para scripts y agentes; en `init` implica `-y` (`reason`: `exists`, `up-to-date` o `dry-run` si no escribió) |
 | `--cwd <dir>` | Proyecto a configurar (por defecto, el directorio actual) |
 | `--no-color` | Desactiva los colores |
 

@@ -39,15 +39,44 @@ firma todavía no está soportada por la plataforma.
 
 Cada pregunta mapea uno a uno con un input real de `build-mobile.yml` — nunca
 promete una funcionalidad que la plataforma no implemente. Si `.github/workflows/build.yml`
-ya existe, se solicita confirmación antes de sobrescribirlo, y si se indica
-que los secrets de firma ya están configurados, se listan los nombres exactos
-que deben cargarse en GitHub (ver [Firma de apps](/docs/signing)) sin
-solicitarlos ni manipularlos.
+ya existe, se muestra un diff contra el archivo actual y se pide confirmar los
+cambios. Si vas a firmar, al final se consultan los secrets del repo con
+[GitHub CLI](https://cli.github.com) y se marcan los que ya están cargados y
+los que faltan (ver [Firma de apps](/docs/signing)).
 
 Sin preguntas: `npx shadownrx-code -y` usa lo detectado y los valores por
 defecto. `--play-store` y `--testflight` activan la subida a las tiendas en tags
 `v*` (ver [Publicar en tiendas](/docs/publishing)); `--release` adjunta los
-builds a un GitHub Release; `--dry-run` solo muestra el YAML.
+builds a un GitHub Release; `--dry-run` solo muestra el YAML; `--json`
+devuelve el resultado en JSON para scripts y agentes.
+
+## Antes de pushear: `doctor`
+
+```bash
+npx shadownrx-code doctor
+```
+
+Revisa en segundos lo que de otro modo falla recién en GitHub Actions: que el
+`project_type` de `build.yml` coincida con el proyecto, que
+`android/app/build.gradle` lea `key.properties` (si no, el release sale firmado
+con la clave debug) y `-PversionCode` cuando publicás en Google Play, y qué
+secrets faltan en el repo según lo que vas a firmar o publicar. Cada problema
+viene con el arreglo sugerido. Sale con código 1 si hay errores, y
+`doctor --json` da el mismo resultado para CI o agentes.
+
+## Cargar la firma: `secrets`
+
+```bash
+npx shadownrx-code secrets
+```
+
+Pide el keystore de Android, el `.p12` y el perfil `.mobileprovision` de iOS,
+el JSON de la service account de Google Play y la key `.p8` de App Store
+Connect. Antes de subir nada **los valida en tu máquina**: abre el keystore con
+`keytool` igual que el workflow, prueba el password del `.p12` con `openssl`, y
+revisa vencimiento y tipo del perfil. Después los convierte a base64 y los sube
+con `gh secret set`; los valores viajan por stdin, nunca como argumentos ni en
+archivos temporales. `--dry-run` valida sin subir.
 
 ## Instalación global
 

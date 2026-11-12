@@ -261,6 +261,60 @@ export function pipeline({ projectType, buildAndroid, buildIos, createRelease, p
   return lines;
 }
 
+// ─── Diff ───────────────────────────────────────────────────────────────────
+
+/**
+ * Line diff (LCS) between two texts as `[op, line]` pairs, op one of
+ * ' ', '-', '+'. Workflow files are tens of lines, so O(n·m) is fine.
+ */
+export function diffLines(before, after) {
+  const a = before.replace(/\n$/, '').split('\n');
+  const b = after.replace(/\n$/, '').split('\n');
+  const n = a.length;
+  const m = b.length;
+  const lcs = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const out = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      out.push([' ', a[i]]);
+      i++;
+      j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) out.push(['-', a[i++]]);
+    else out.push(['+', b[j++]]);
+  }
+  while (i < n) out.push(['-', a[i++]]);
+  while (j < m) out.push(['+', b[j++]]);
+  return out;
+}
+
+/** Colored unified-style hunks of `diffLines`, `context` unchanged lines around each change. */
+export function renderDiff(ops, { context = 2 } = {}) {
+  const keep = ops.map((_, idx) =>
+    ops.slice(Math.max(0, idx - context), idx + context + 1).some(([op]) => op !== ' ')
+  );
+  const lines = [];
+  let skipped = false;
+  ops.forEach(([op, line], idx) => {
+    if (!keep[idx]) {
+      skipped = true;
+      return;
+    }
+    if (skipped && lines.length) lines.push(c.gray('  ⋯'));
+    skipped = false;
+    if (op === '-') lines.push(c.red(`- ${line}`));
+    else if (op === '+') lines.push(c.green(`+ ${line}`));
+    else lines.push(c.gray(`  ${line}`));
+  });
+  return lines;
+}
+
 // ─── YAML highlighting ──────────────────────────────────────────────────────
 
 /** Minimal line-based YAML coloring, enough for the workflow we generate. */
