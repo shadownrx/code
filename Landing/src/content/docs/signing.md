@@ -10,6 +10,11 @@ simulador/emulador. Para instalar en un dispositivo real o publicar en las
 tiendas, configurá la firma con **GitHub Secrets** en el repo que usa la
 plataforma (`Settings → Secrets and variables → Actions`).
 
+> Atajo: [`npx shadownrx-code secrets`](/docs/cli) pide el keystore, el `.p12`
+> y el perfil, **los valida en tu máquina** y los sube como secrets con
+> `gh secret set`, sin base64 a mano. Lo que sigue es el mismo resultado, a
+> mano.
+
 ## Android
 
 1. Generá un keystore de release, si no tenés uno:

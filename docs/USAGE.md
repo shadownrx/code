@@ -15,7 +15,8 @@ límites impuestos por esta plataforma.
 > Atajo: `npx shadownrx-code`, parado en tu proyecto, te hace un par de
 > preguntas y escribe este archivo por vos — ver
 > [`cli/README.md`](../cli/README.md). Lo que sigue es el mismo resultado, a
-> mano.
+> mano. Después, `npx shadownrx-code doctor` revisa que todo esté listo antes
+> del primer push.
 
 Creá `.github/workflows/build.yml` en tu proyecto:
 

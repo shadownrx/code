@@ -15,7 +15,8 @@ Actions, sus propios secrets y sus propios artifacts.
 
 > Atajo: [`npx shadownrx-code`](/docs/cli) parado en tu proyecto hace las
 > preguntas necesarias y escribe el archivo por vos. Lo que sigue es el mismo
-> resultado, a mano.
+> resultado, a mano. Después, `npx shadownrx-code doctor` revisa que todo esté
+> listo antes del primer push.
 
 ## Agregar el workflow
 

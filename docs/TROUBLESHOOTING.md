@@ -4,6 +4,11 @@ Esta lista incluye errores reales que aparecieron mientras se armaba y probaba e
 plataforma (algunos ya corregidos en `build-mobile.yml`, documentados acá por si
 volvés a tocar el workflow) y otros esperables al conectar un proyecto propio.
 
+> Antes de buscar acá: `npx shadownrx-code doctor` detecta en segundos varios
+> de estos errores sin gastar minutos de CI (`project_type` equivocado,
+> `build.gradle` que no lee `key.properties` o `-PversionCode`, secrets
+> faltantes o a medio cargar), y sugiere el arreglo.
+
 ## Errores del workflow en sí (`build-mobile.yml`)
 
 ### "Invalid workflow file... Unrecognized named-value: 'secrets'"
