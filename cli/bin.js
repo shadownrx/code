@@ -9,6 +9,7 @@ import {
   androidSecrets,
   appStoreSecrets,
   buildWorkflowYaml,
+  detectDefaultBranch,
   detectProjectType,
   iosSecrets,
   playStoreSecrets,
@@ -266,6 +267,7 @@ async function main() {
     createRelease,
     publishPlayStore,
     publishTestflight,
+    branch: detectDefaultBranch(cwd),
   };
   const yaml = buildWorkflowYaml(config);
   const yes = c.green('sí');

@@ -12,12 +12,14 @@ import {
   androidSecrets,
   appStoreSecrets,
   buildWorkflowYaml,
+  detectDefaultBranch,
   detectProjectType,
   iosSecrets,
   playStoreSecrets,
 } from './lib.js';
 
-const server = new McpServer({ name: 'shadownrx-code', version: '1.0.0' });
+const { version } = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+const server = new McpServer({ name: 'shadownrx-code', version });
 
 const PROJECT_TYPES = ['auto', 'flutter', 'react-native', 'pwa', 'electron'];
 
@@ -77,6 +79,10 @@ server.registerTool(
         .boolean()
         .optional()
         .describe('Upload the signed .ipa to TestFlight on v* tag pushes. Needs an App Store provisioning profile + APP_STORE_CONNECT_* secrets. Default false.'),
+      branch: z
+        .string()
+        .optional()
+        .describe("Branch whose pushes trigger a build. Defaults to the repo's default branch (origin/HEAD), else the current branch."),
       overwrite: z.boolean().optional().describe('Overwrite an existing .github/workflows/build.yml. Default false.'),
     },
   },
@@ -89,6 +95,7 @@ server.registerTool(
     create_release,
     publish_play_store,
     publish_testflight,
+    branch,
     overwrite,
   }) => {
     const dir = cwd ? path.resolve(cwd) : process.cwd();
@@ -124,6 +131,7 @@ server.registerTool(
       createRelease: create_release ?? false,
       publishPlayStore,
       publishTestflight,
+      branch: branch ?? detectDefaultBranch(dir),
     });
 
     const workflowPath = path.join(dir, '.github', 'workflows', 'build.yml');

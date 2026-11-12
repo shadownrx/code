@@ -152,7 +152,7 @@ Expone dos tools:
 | Tool | Qué hace |
 |---|---|
 | `detect_project_type` | Solo lectura: reporta si un directorio es Flutter, React Native, PWA o Electron. No escribe nada. |
-| `setup_mobile_ci` | Detecta el tipo de proyecto (o recibe `project_type` explícito) y escribe `.github/workflows/build.yml` — mismos parámetros que el CLI interactivo (`build_android`, `build_ios`, `build_electron`, `create_release`, `publish_play_store`, `publish_testflight`), más `overwrite` para confirmar la sobrescritura si el archivo ya existe. |
+| `setup_mobile_ci` | Detecta el tipo de proyecto (o recibe `project_type` explícito) y escribe `.github/workflows/build.yml` — mismos parámetros que el CLI interactivo (`build_android`, `build_ios`, `build_electron`, `create_release`, `publish_play_store`, `publish_testflight`), más `branch` (rama que dispara el build en cada push; por defecto la rama por defecto del repo) y `overwrite` para confirmar la sobrescritura si el archivo ya existe. |
 
 Ambas tools están cubiertas por tests de punta a punta contra el servidor
 real (no un mock): `mcp-server.test.js` levanta `mcp-server.js` como
@@ -173,6 +173,10 @@ detalle de cada input está documentado en
 | Qué compilar (Android / iOS / ambas) — no aplica a Electron | `build_android`, `build_ios` |
 | ¿Adjuntar a un GitHub Release en tags? | `create_release` (incluye el bloque `permissions: contents: write` requerido) |
 | ¿Publicar en las tiendas al pushear un tag? | `publish_play_store` / `publish_testflight` en tags `v*`, más `build_number: ${{ github.run_number }}` (y `ios_export_method: app-store` con TestFlight) |
+
+El trigger `push` del workflow generado usa la rama por defecto del repo
+(`origin/HEAD`); si no hay remoto, la rama actual; y si no es un repo git,
+`main`. Así un repo en `master` compila en cada push sin editar nada a mano.
 
 Para proyectos Electron, en lugar de `build_android`/`build_ios` se emite
 `build_electron: true` (siempre compila para los tres sistemas operativos).
