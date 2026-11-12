@@ -126,7 +126,7 @@ jobs:
     outputs:
       project_type: ${{ steps.pick.outputs.project_type }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Detection runs inline rather than as a local composite action: in a
       # reusable workflow, `uses: ./...` resolves against the CALLER's
       # checkout, where shadownrx/code's .github/actions/ doesn't exist.
@@ -135,16 +135,25 @@ jobs:
         shell: bash
         working-directory: ${{ inputs.working_directory }}
         run: |
+          # Must stay in sync with detectProjectType() in cli/lib.js —
+          # cli/workflow.test.js runs this script against the same fixtures.
+          # Only real dependencies count (not keywords, scripts, etc.), and a
+          # malformed package.json is treated as "no match", like the CLI.
+          has_dep() {
+            jq -e '((.dependencies // {}) + (.devDependencies // {})) as $d
+                   | any($ARGS.positional[]; . as $n | $d | has($n))' \
+              package.json --args "$@" >/dev/null 2>&1
+          }
           if [ -f "pubspec.yaml" ] && grep -qE "^\s*flutter:" pubspec.yaml; then
             echo "Detected: Flutter project"
             echo "project_type=flutter" >> "$GITHUB_OUTPUT"
           elif [ -f "capacitor.config.ts" ] || [ -f "capacitor.config.json" ]; then
             echo "Detected: Capacitor (PWA) project"
             echo "project_type=pwa" >> "$GITHUB_OUTPUT"
-          elif [ -f "package.json" ] && grep -qE '"electron(-builder)?"' package.json; then
+          elif [ -f "package.json" ] && has_dep electron electron-builder; then
             echo "Detected: Electron project"
             echo "project_type=electron" >> "$GITHUB_OUTPUT"
-          elif [ -f "package.json" ] && grep -q '"react-native"' package.json; then
+          elif [ -f "package.json" ] && has_dep react-native; then
             echo "Detected: React Native project"
             echo "project_type=react-native" >> "$GITHUB_OUTPUT"
           else
@@ -172,20 +181,23 @@ jobs:
       HAS_PLAY_CREDENTIALS: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
       BUILD_NUMBER: ${{ inputs.build_number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           # Capacitor 8's Android module compiles against Java 21; 21 is
           # backward-compatible for Flutter/React Native's Gradle setup too.
           java-version: "21"
+          cache: gradle
 
       # Decodes the real keystore (or, with signing_self_test, generates a
       # throwaway one) and checks the password/alias actually open it, so a
       # wrong secret fails here with a clear message instead of deep inside
       # Gradle. Its certificate fingerprint is what "Verify Android
       # signature" later compares every .apk/.aab against.
+      # Secrets go through env, never `${{ }}` inside the script: a password
+      # containing $, ` or \ would otherwise be expanded by bash.
       - name: Prepare Android signing keystore
         id: keystore
         working-directory: ${{ inputs.working_directory }}
@@ -209,7 +221,7 @@ jobs:
           mkdir -p android/keystore
           KS="$PWD/android/keystore/release.jks"
           if [ "$mode" = "real" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KS"
           else
             KEYSTORE_PASSWORD="selftest-$(openssl rand -hex 12)"
             KEY_PASSWORD="$KEYSTORE_PASSWORD"
@@ -227,16 +239,20 @@ jobs:
           fi
           SHA256=$(echo "$CERT" | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr 'A-F' 'a-f')
 
-          # Absolute path: Gradle's file() in android/app/build.gradle resolves
-          # relative paths against android/app/, not android/, so a relative
-          # storeFile only works if the project uses rootProject.file(). An
-          # absolute path works with either pattern.
-          cat > android/key.properties <<EOF
-          storeFile=$KS
-          storePassword=$KEYSTORE_PASSWORD
-          keyAlias=$KEY_ALIAS
-          keyPassword=$KEY_PASSWORD
-          EOF
+          # storeFile is absolute: Gradle's file() in android/app/build.gradle
+          # resolves relative paths against android/app/, not android/, so a
+          # relative storeFile only works if the project uses
+          # rootProject.file(). An absolute path works with either pattern.
+          # key.properties is a Java .properties file: \ is escaped so it's
+          # read back literally, and so is leading whitespace, which Java
+          # would otherwise strip from the value.
+          esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/^\([[:space:]]\)/\\\1/'; }
+          {
+            echo "storeFile=$(esc "$KS")"
+            echo "storePassword=$(esc "$KEYSTORE_PASSWORD")"
+            echo "keyAlias=$(esc "$KEY_ALIAS")"
+            echo "keyPassword=$(esc "$KEY_PASSWORD")"
+          } > android/key.properties
 
           echo "Keystore OK ($mode) — certificado SHA-256: $SHA256"
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
@@ -262,7 +278,7 @@ jobs:
           flutter build appbundle --release ${BUILD_NUMBER:+--build-number=$BUILD_NUMBER}
 
       # --- React Native ---
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: needs.detect.outputs.project_type == 'react-native'
         with:
           node-version: ${{ inputs.node_version }}
@@ -284,7 +300,7 @@ jobs:
           ./gradlew assembleRelease bundleRelease ${BUILD_NUMBER:+-PversionCode=$BUILD_NUMBER}
 
       # --- Capacitor (PWA wrapped as a native app) ---
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: needs.detect.outputs.project_type == 'pwa'
         with:
           node-version: ${{ inputs.node_version }}
@@ -329,7 +345,7 @@ jobs:
           EXPECTED: ${{ steps.keystore.outputs.sha256 }}
         run: |
           shopt -s nullglob
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          BT=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           HINT="tu android/app/build.gradle no está usando android/key.properties para el buildType release — ver docs/SIGNING.md"
           fail=0
           checked=0
@@ -378,7 +394,7 @@ jobs:
           fi
           exit $fail
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: android-build
           path: ${{ inputs.working_directory }}/android-artifacts/*
@@ -417,8 +433,8 @@ jobs:
           fi
 
           if [ -z "$PACKAGE_NAME" ]; then
-            BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
-            apk=$(ls android-artifacts/*.apk | head -1)
+            BT=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+            apk=$(find android-artifacts -maxdepth 1 -name '*.apk' | sort | head -1)
             PACKAGE_NAME=$("$BT/aapt2" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
           fi
           if [ -z "$PACKAGE_NAME" ]; then
@@ -453,7 +469,7 @@ jobs:
       # Uploading to TestFlight only accepts an App Store-signed .ipa.
       EXPORT_METHOD: ${{ inputs.publish_testflight && 'app-store' || inputs.ios_export_method }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine if iOS signing secrets are present
         id: signing
@@ -480,6 +496,8 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           # Prepend to the search list (not just default-keychain) so
           # codesign and xcodebuild both find the identity.
+          # Word splitting is intended: one argument per existing keychain.
+          # shellcheck disable=SC2046
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           security default-keychain -s "$KEYCHAIN"
 
@@ -497,7 +515,8 @@ jobs:
             exit 1
           fi
 
-          export IDENTITIES="$(security find-identity -v -p codesigning "$KEYCHAIN")"
+          IDENTITIES="$(security find-identity -v -p codesigning "$KEYCHAIN")"
+          export IDENTITIES
           echo "$IDENTITIES"
           python3 - "$RUNNER_TEMP/profile.mobileprovision" "$RUNNER_TEMP/profile.plist" <<'PY'
           import datetime, hashlib, os, plistlib, re, shutil, sys
@@ -697,7 +716,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent build/ios/iphoneos/Runner.app build/ios-unsigned/Runner-unsigned.zip
 
       # --- React Native ---
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: needs.detect.outputs.project_type == 'react-native'
         with:
           node-version: ${{ inputs.node_version }}
@@ -719,7 +738,7 @@ jobs:
         working-directory: ${{ inputs.working_directory }}/ios
         run: |
           SCHEME=$(xcodebuild -list -json | node -e "const d=JSON.parse(require('fs').readFileSync(0));console.log(d.project.schemes[0]||d.workspace.schemes[0])")
-          xcodebuild -workspace *.xcworkspace -scheme "$SCHEME" -sdk iphoneos -configuration Release \
+          xcodebuild -workspace ./*.xcworkspace -scheme "$SCHEME" -sdk iphoneos -configuration Release \
             -archivePath build/App.xcarchive archive \
             ${BUILD_NUMBER:+CURRENT_PROJECT_VERSION=$BUILD_NUMBER}
           xcodebuild -exportArchive -archivePath build/App.xcarchive \
@@ -730,13 +749,13 @@ jobs:
         working-directory: ${{ inputs.working_directory }}/ios
         run: |
           SCHEME=$(xcodebuild -list -json | node -e "const d=JSON.parse(require('fs').readFileSync(0));console.log(d.project.schemes[0]||d.workspace.schemes[0])")
-          xcodebuild -workspace *.xcworkspace -scheme "$SCHEME" -sdk iphonesimulator -configuration Release \
+          xcodebuild -workspace ./*.xcworkspace -scheme "$SCHEME" -sdk iphonesimulator -configuration Release \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO
           mkdir -p build/ios-unsigned
           ditto -c -k --sequesterRsrc --keepParent "build/Build/Products/Release-iphonesimulator/$SCHEME.app" build/ios-unsigned/App-unsigned.zip
 
       # --- Capacitor (PWA wrapped as a native app) ---
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: needs.detect.outputs.project_type == 'pwa'
         with:
           node-version: ${{ inputs.node_version }}
@@ -806,7 +825,7 @@ jobs:
           for ipa in "${ipas[@]}"; do
             tmp=$(mktemp -d)
             unzip -q "$ipa" -d "$tmp"
-            app=$(ls -d "$tmp"/Payload/*.app | head -1)
+            app=$(find "$tmp/Payload" -mindepth 1 -maxdepth 1 -type d -name '*.app' | head -1)
             if ! codesign --verify --deep --strict "$app" 2>&1; then
               echo "::error::$ipa: la firma de la app no es válida (codesign --verify)."
               fail=1
@@ -825,7 +844,7 @@ jobs:
           done
           exit $fail
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ios-build
           path: ${{ inputs.working_directory }}/ios-artifacts/*
@@ -855,7 +874,7 @@ jobs:
             exit 1
           fi
 
-          ipa=$(ls ios-artifacts/*.ipa | head -1)
+          ipa=$(find ios-artifacts -maxdepth 1 -name '*.ipa' | sort | head -1)
           # altool looks the key up by ID in this directory.
           mkdir -p ~/.appstoreconnect/private_keys
           KEY_FILE=~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
@@ -876,9 +895,9 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node_version }}
           cache: npm
@@ -913,7 +932,7 @@ jobs:
             -exec cp {} electron-artifacts/ \; 2>/dev/null || true
           ls -la electron-artifacts
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: electron-build-${{ matrix.os }}
           path: ${{ inputs.working_directory }}/electron-artifacts/*
@@ -935,7 +954,7 @@ jobs:
     env:
       HAS_SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
@@ -980,7 +999,7 @@ jobs:
 
       - name: Attach artifacts to GitHub Release (optional, tags only)
         if: inputs.create_release && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: artifacts/**
           fail_on_unmatched_files: false

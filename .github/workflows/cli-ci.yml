@@ -1,0 +1,55 @@
+name: CLI + workflow checks
+
+# Runs the CLI's test suite (which also executes the detection and signing
+# scripts from build-mobile.yml against fixtures) and lints every workflow
+# with actionlint + shellcheck. Cheap and fast: catches a broken reusable
+# workflow before it reaches the slow example-*-ci.yml builds or a user.
+
+on:
+  push:
+    paths:
+      - "cli/**"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - "cli/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Lowest Node the published CLI supports (cli/package.json engines)
+        # and the current LTS.
+        node: ["18", "24"]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: cli/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm test
+        run: npm test
+
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # ubuntu-latest ships shellcheck, which actionlint picks up for run: blocks.
+      - name: actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color

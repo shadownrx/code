@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -41,6 +42,30 @@ export function detectProjectType(cwd) {
   return null;
 }
 
+function git(cwd, args) {
+  try {
+    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * The branch the generated workflow should build on push: the remote's
+ * default branch if known (origin/HEAD), else the current branch, else
+ * 'main'. Hardcoding 'main' meant repos on 'master' (or 'Main') never
+ * built on push.
+ */
+export function detectDefaultBranch(cwd) {
+  const remoteHead = git(cwd, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  if (remoteHead.startsWith('origin/')) return remoteHead.slice('origin/'.length);
+
+  const current = git(cwd, ['symbolic-ref', '--quiet', '--short', 'HEAD']);
+  if (current) return current;
+
+  return 'main';
+}
+
 export function androidSecrets() {
   return ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD'];
 }
@@ -78,17 +103,21 @@ export function buildWorkflowYaml({
   createRelease,
   publishPlayStore = false,
   publishTestflight = false,
+  branch = 'main',
 }) {
   const isElectron = projectType === 'electron';
   const playStore = !isElectron && buildAndroid && publishPlayStore;
   const testflight = !isElectron && buildIos && publishTestflight;
+  // Plain branch names go in unquoted, like the docs show; anything YAML
+  // could misread is emitted as a JSON (= YAML) string.
+  const branchYaml = /^[A-Za-z0-9._/-]+$/.test(branch) ? branch : JSON.stringify(branch);
 
   const lines = [
     'name: Build Mobile Apps',
     '',
     'on:',
     '  push:',
-    '    branches: [main]',
+    `    branches: [${branchYaml}]`,
     '    tags: ["v*"]',
     '  pull_request:',
     '  workflow_dispatch:',
